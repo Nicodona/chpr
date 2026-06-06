@@ -1,20 +1,18 @@
 /**
  * ProtectedRoute
  *
- * Wraps any route that requires login. While the auth context is still
- * resolving the initial /me check (ready=false) we show nothing so the
- * user doesn't see a flash of the login screen. Once ready, unauthenticated
- * visitors are sent to /login with a `next` param so they're redirected back
- * after a successful login.
+ * Wraps routes that require login. Pass `adminOnly` to restrict to admin users.
+ * While the auth context is resolving (ready=false) we render nothing to avoid
+ * a flash of the login screen.
  */
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({ children, adminOnly = false }) {
   const { user, ready } = useAuth();
   const location = useLocation();
 
-  if (!ready) return null; // still resolving — render nothing momentarily
+  if (!ready) return null;
 
   if (!user) {
     return (
@@ -23,6 +21,10 @@ export default function ProtectedRoute({ children }) {
         replace
       />
     );
+  }
+
+  if (adminOnly && user.role !== "admin") {
+    return <Navigate to="/" replace />;
   }
 
   return children;

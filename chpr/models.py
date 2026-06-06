@@ -50,6 +50,7 @@ class Project(models.Model):
     light_color = models.CharField(max_length=9, default="#e6f1fb", help_text="Light accent (hex)")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     order = models.PositiveIntegerField(default=0, help_text="Display order on the hub")
+    is_active = models.BooleanField(default=True, help_text="Inactive projects are hidden from the public site.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -166,3 +167,62 @@ class ContactMessage(models.Model):
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
+
+
+class QuizQuestion(models.Model):
+    """MCQ question for a resource's 'Test your understanding' quiz."""
+
+    OPTION_CHOICES = [("a", "A"), ("b", "B"), ("c", "C"), ("d", "D")]
+
+    resource = models.ForeignKey(
+        Resource, on_delete=models.CASCADE, related_name="quiz_questions"
+    )
+    question = models.TextField()
+    option_a = models.CharField(max_length=500)
+    option_b = models.CharField(max_length=500)
+    option_c = models.CharField(max_length=500)
+    option_d = models.CharField(max_length=500)
+    correct = models.CharField(max_length=1, choices=OPTION_CHOICES)
+    explanation = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "created_at"]
+
+    def __str__(self):
+        return f"Q{self.order}: {self.question[:60]}"
+
+
+class ReadingProgress(models.Model):
+    """Tracks how far an authenticated user has read a resource."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reading_progress")
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="reading_progress")
+    progress = models.PositiveSmallIntegerField(default=0)
+    seen_pages = models.JSONField(default=list, blank=True)
+    completed = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("user", "resource")]
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.user.username} – {self.resource_id} – {self.progress}%"
+
+
+class QuizAttempt(models.Model):
+    """Records a completed quiz attempt for an authenticated user."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="quiz_attempts")
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="quiz_attempts")
+    score = models.PositiveSmallIntegerField(default=0)
+    total = models.PositiveSmallIntegerField(default=0)
+    percent = models.PositiveSmallIntegerField(default=0)
+    passed = models.BooleanField(default=False)
+    attempted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-attempted_at"]
+
+    def __str__(self):
+        return f"{self.user.username} – {self.resource_id} – {self.percent}%"

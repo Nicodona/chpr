@@ -1,10 +1,3 @@
-/**
- * Home page — updated for auth.
- *
- * The "+ Add resource" quick-access tile is now hidden for visitors who are
- * not logged in (they'd just get redirected to /login anyway). Everything
- * else is identical to the original.
- */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchProjects, fetchResources } from "../api";
@@ -13,76 +6,116 @@ import { useAuth } from "../context/AuthContext";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 
-// Static navigation shortcuts — Add Resource tile is conditionally rendered.
 const PUBLIC_TILES = [
-  { to: "/resources",        mark: "All",  label: "Browse all",  color: "#46556e", bg: "#eef1f6" },
-  { to: "/resources?type=alg", mark: "Alg", label: "Algorithms",  color: "#0054A6", bg: "#e6f1fb" },
-  { to: "/resources?type=job", mark: "Job", label: "Job Aids",    color: "#0f6e56", bg: "#e1f5ee" },
-  { to: "/resources?type=vid", mark: "Vid", label: "Videos",      color: "#46556e", bg: "#eef1f6" },
-  { to: "/resources?type=pool",mark: "Pool","label": "Pool Tests", color: "#8a5410", bg: "#faeeda" },
+  { to:"/resources",          mark:"All",  label:"Browse all",   color:"#46556e", bg:"#eef1f6" },
+  { to:"/resources?type=alg", mark:"Alg",  label:"Algorithms",   color:"#0054A6", bg:"#e6f1fb" },
+  { to:"/resources?type=job", mark:"Job",  label:"Job Aids",     color:"#0f6e56", bg:"#e1f5ee" },
+  { to:"/resources?type=vid", mark:"Vid",  label:"Videos",       color:"#46556e", bg:"#eef1f6" },
+  { to:"/resources?type=pool",mark:"Pool", label:"Pool Tests",   color:"#8a5410", bg:"#faeeda" },
+];
+const ADMIN_TILE = { to:"/manage", mark:"⚙", label:"Admin Panel", color:"#0f172a", bg:"#334155", isAdmin:true };
+
+// TB education info-cards — icon + title + description; duplicated in JSX for seamless loop
+const TICKER_TOP = [
+  { icon:"🤧", title:"Cover your cough",     desc:"Use your inner elbow to block respiratory droplets from spreading." },
+  { icon:"😷", title:"Wear a mask",           desc:"Essential in crowded or poorly ventilated indoor spaces." },
+  { icon:"🪟", title:"Improve ventilation",   desc:"Open windows and doors — fresh air dilutes airborne TB bacteria." },
+  { icon:"🧪", title:"Sputum collection",     desc:"Collect early morning on an empty stomach for the best sample." },
+  { icon:"💊", title:"Complete treatment",    desc:"Never stop TB medication early — it prevents dangerous resistance." },
+  { icon:"🏥", title:"Isolate when ill",      desc:"Stay home and wear a mask until you are no longer infectious." },
+  { icon:"🌡️",title:"Know the symptoms",     desc:"Persistent cough, night sweats, fever, unexplained weight loss." },
+  { icon:"🤝", title:"Know your status",      desc:"Early testing leads to early treatment and full recovery." },
+];
+const TICKER_BOTTOM = [
+  { icon:"🔬", title:"Early diagnosis",       desc:"Getting tested quickly saves lives — TB is curable when caught early." },
+  { icon:"💉", title:"BCG vaccination",       desc:"Protects infants and children against severe forms of tuberculosis." },
+  { icon:"📋", title:"Follow your plan",      desc:"Take every prescribed dose daily — consistency is the key to cure." },
+  { icon:"🍎", title:"Nutrition matters",     desc:"A healthy, balanced diet helps your immune system fight TB faster." },
+  { icon:"👨‍⚕️",title:"See a clinician",    desc:"Don't wait — consult a healthcare worker for any cough over 2 weeks." },
+  { icon:"🌍", title:"TB is curable",         desc:"With proper treatment 95% of TB patients make a full recovery." },
+  { icon:"🧬", title:"GeneXpert testing",     desc:"Rapid molecular test detects TB and drug resistance in under 2 hours." },
+  { icon:"❤️", title:"End TB together",       desc:"Community awareness and action are the key to eliminating tuberculosis." },
 ];
 
-const ADD_TILE = {
-  to: "/resources/new", mark: "+", label: "Add resource", color: "#0f6e56", bg: "#e1f5ee",
-};
-
 export default function Home() {
-  const { user }       = useAuth();
-  const [projects, setProjects] = useState([]);
+  const { user }        = useAuth();
+  const [projects, setProjects]   = useState([]);
   const [resources, setResources] = useState([]);
-  const [type, setType] = useState("all");
-  const [q, setQ]       = useState("");
-  const navigate        = useNavigate();
+  const [type, setType]           = useState("all");
+  const [q, setQ]                 = useState("");
+  const navigate                  = useNavigate();
 
-  // Inject the Add Resource tile only when authenticated.
   const tiles = useMemo(
-    () => (user ? [PUBLIC_TILES[0], ADD_TILE, ...PUBLIC_TILES.slice(1)] : PUBLIC_TILES),
+    () => user?.role === "admin" ? [...PUBLIC_TILES, ADMIN_TILE] : PUBLIC_TILES,
     [user],
   );
 
+  useEffect(() => { fetchProjects().then(setProjects).catch(console.error); }, []);
   useEffect(() => {
-    fetchProjects().then(setProjects).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    fetchResources(type === "pool" ? { type: "pool" } : { type }).then(setResources).catch(console.error);
+    fetchResources(type === "pool" ? { type:"pool" } : { type }).then(setResources).catch(console.error);
   }, [type]);
 
   return (
     <>
-      <section className="hero-minimal">
-        <div className="hero-minimal-inner">
-          <div className="hero-search">
+      {/* ── Hero ── */}
+      <section className="hero-anim" aria-label="CHPR Resources Hub">
+
+        {/* Background — slow continuous scroll along the bottom */}
+        <div className="hero-bg-anim" aria-hidden="true">
+          <div className="hero-ticker">
+            <div className="hero-ticker-track">
+              {[...TICKER_BOTTOM, ...TICKER_BOTTOM].map((item, i) => (
+                <div key={i} className="htic-card">
+                  <div className="htic-icon-wrap">
+                    <span className="htic-emoji">{item.icon}</span>
+                  </div>
+                  <div className="htic-info">
+                    <div className="htic-title">{item.title}</div>
+                    <div className="htic-desc">{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Foreground — centered content */}
+        <div className="hero-fg">
+          <div className="hero-anim-badge">
+            <span className="hero-anim-badge-dot" />
+            CHPR Resources Hub
+          </div>
+
+          <h1 className="hero-anim-title">
+            Fighting TB<br /><span className="hero-anim-title-accent">Together</span>
+          </h1>
+
+          <p className="hero-anim-sub">
+            Empowering healthcare workers with tools, protocols, and evidence-based resources to end tuberculosis.
+          </p>
+
+          <div className="hero-search hero-anim-search">
             <svg className="hero-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="7" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
             <input
               type="text"
-              placeholder="Search resources, projects, or material types…"
+              placeholder="Search resources, protocols, materials…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && q.trim() &&
-                navigate(`/resources?search=${encodeURIComponent(q.trim())}`)
-              }
+              onChange={e => setQ(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && q.trim() && navigate(`/resources?search=${encodeURIComponent(q.trim())}`)}
             />
-            <button
-              className="hero-search-btn"
-              onClick={() =>
-                q.trim() && navigate(`/resources?search=${encodeURIComponent(q.trim())}`)
-              }
-            >
+            <button className="hero-search-btn" onClick={() => q.trim() && navigate(`/resources?search=${encodeURIComponent(q.trim())}`)}>
               Search
             </button>
           </div>
 
           <div className="hero-tiles">
-            {tiles.map((tile) => (
+            {tiles.map(tile => (
               <Link
                 key={tile.label}
                 to={tile.to}
-                className="hero-tile"
+                className={"hero-tile" + (tile.isAdmin ? " hero-tile-admin" : "")}
                 style={{ "--tile-color": tile.color, "--tile-bg": tile.bg }}
               >
                 <span className="hero-tile-mark">{tile.mark}</span>
@@ -91,8 +124,10 @@ export default function Home() {
             ))}
           </div>
         </div>
+
       </section>
 
+      {/* ── Main content ── */}
       <main className="main">
         <div className="section-header">
           <div>
@@ -103,7 +138,7 @@ export default function Home() {
         </div>
 
         <div className="projects-grid">
-          {projects.map((p) => (
+          {projects.map(p => (
             <Link
               key={p.slug}
               to={`/projects/${p.slug}`}
@@ -112,7 +147,7 @@ export default function Home() {
             >
               <div className="project-card-top">
                 <span className="project-card-mark">
-                  {p.short_name?.slice(0, 2).toUpperCase() || p.name.slice(0, 2).toUpperCase()}
+                  {p.short_name?.slice(0,2).toUpperCase() || p.name.slice(0,2).toUpperCase()}
                 </span>
                 <span className={`badge badge-${p.status === "completed" ? "completed" : "active"}`}>
                   {p.status_display || p.status}
@@ -121,9 +156,7 @@ export default function Home() {
               <h3>{p.name}</h3>
               <p>{p.description}</p>
               <div className="project-meta">
-                <span className="project-count">
-                  {p.resource_count} resource{p.resource_count !== 1 ? "s" : ""}
-                </span>
+                <span className="project-count">{p.resource_count} resource{p.resource_count !== 1 ? "s" : ""}</span>
                 <span className="project-arrow" aria-hidden="true">→</span>
               </div>
             </Link>
@@ -145,12 +178,10 @@ export default function Home() {
         <div className="resource-panel">
           <div className="resource-panel-header">
             <h3>All resources</h3>
-            <span>
-              {resources.length} resource{resources.length !== 1 ? "s" : ""}
-            </span>
+            <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="resources-grid">
-            {resources.slice(0, 8).map((r) => (
+            {resources.slice(0, 8).map(r => (
               <ResourceTile key={r.id} resource={r} />
             ))}
           </div>

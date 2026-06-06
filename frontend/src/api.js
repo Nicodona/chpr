@@ -1,14 +1,3 @@
-/**
- * api.js — centralised fetch helpers.
- *
- * Changes from original:
- * - `authedFetch()` reads the DRF token from localStorage and adds the
- *   `Authorization: Token …` header automatically so callers don't have
- *   to think about it.
- * - `createResource()` now uses authedFetch (POST requires authentication).
- * - All GET helpers remain public (no auth needed).
- */
-
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -17,11 +6,38 @@ function getToken() {
   return localStorage.getItem("chpr_token");
 }
 
-/** Wrapper around fetch that injects the auth token when present. */
+/** Read the csrftoken cookie Django sets. */
+function getCsrfCookie() {
+  const match = document.cookie
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("csrftoken="));
+  return match ? decodeURIComponent(match.split("=")[1]) : null;
+}
+
+/**
+ * Fetch the CSRF token from the server if the cookie isn't set yet.
+ * This is rare after first login but guards against cold-start edge cases.
+ */
+async function ensureCsrfToken() {
+  const existing = getCsrfCookie();
+  if (existing) return existing;
+  const res = await fetch(`${BASE}/api/csrf/`, { credentials: "include" });
+  const data = await res.json();
+  return data.csrfToken ?? getCsrfCookie() ?? "";
+}
+
+/**
+ * Wrapper around fetch that injects the auth token and CSRF token.
+ * Every mutating request (POST/PATCH/PUT/DELETE) needs both so that
+ * DRF's SessionAuthentication CSRF check passes.
+ */
 async function authedFetch(url, options = {}) {
   const token = getToken();
+  const csrfToken = await ensureCsrfToken();
   const headers = { ...(options.headers ?? {}) };
   if (token) headers["Authorization"] = `Token ${token}`;
+  headers["X-CSRFToken"] = csrfToken;
 
   const res = await fetch(`${BASE}${url}`, {
     ...options,
@@ -42,6 +58,8 @@ async function authedFetch(url, options = {}) {
     }
     throw new Error(message);
   }
+  // 204 No Content has no body
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -118,15 +136,104 @@ export async function updateResource(id, fields) {
  * Delete a resource (requires authentication).
  */
 export async function deleteResource(id) {
-  const token = getToken();
-  const headers = {};
-  if (token) headers["Authorization"] = `Token ${token}`;
+  await authedFetch(`/api/resources/${id}/`, { method: "DELETE" });
+}
 
-  const res = await fetch(`${BASE}/api/resources/${id}/`, {
-    method: "DELETE",
-    headers,
-    credentials: "include",
+// ── User management ───────────────────────────────────────────────────────────
+
+/**
+ * Admin creates a new staff/admin account.
+ * The server generates a random password and emails it to the user.
+ */
+export async function createUser(fields) {
+  return authedFetch("/api/auth/create-user/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
   });
-  if (!res.ok) throw new Error(`Delete failed (${res.status})`);
-  // 204 No Content — nothing to parse.
+}
+
+/**
+ * Authenticated user changes their own password.
+ */
+export async function changePassword(fields) {
+  return authedFetch("/api/auth/change-password/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function listUsers() {
+  return authedFetch("/api/auth/users/");
+}
+
+export async function fetchMessages() {
+  return authedFetch("/api/contact/");
+}
+
+export async function patchMessage(id, fields) {
+  return authedFetch(`/api/contact/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+}
+
+// ── Resource detail ───────────────────────────────────────────────────────────
+
+export async function fetchResource(id) {
+  const res = await fetch(`${BASE}/api/resources/${id}/`, { credentials: "include" });
+  if (!res.ok) throw new Error("Resource not found");
+  return res.json();
+}
+
+export async function fetchComments(resourceId) {
+  const res = await fetch(`${BASE}/api/comments/?resource=${resourceId}`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch comments");
+  const data = await res.json();
+  return data.results ?? data;
+}
+
+export async function postComment(fields) {
+  return authedFetch("/api/comments/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function fetchQuizQuestions(resourceId) {
+  const res = await fetch(`${BASE}/api/quiz-questions/?resource=${resourceId}`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch questions");
+  const data = await res.json();
+  return data.results ?? data;
+}
+
+export async function createQuizQuestion(fields) {
+  return authedFetch("/api/quiz-questions/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function updateQuizQuestion(id, fields) {
+  return authedFetch(`/api/quiz-questions/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function deleteQuizQuestion(id) {
+  await authedFetch(`/api/quiz-questions/${id}/`, { method: "DELETE" });
+}
+
+export async function submitQuiz(resourceId, answers) {
+  return authedFetch(`/api/resources/${resourceId}/submit-quiz/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+  });
 }

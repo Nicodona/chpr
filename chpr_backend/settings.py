@@ -180,3 +180,26 @@ SPECTACULAR_SETTINGS = {
 # CORS — only needed when running the Vite dev server on a different origin.
 # ---------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+# Required so the browser sends/receives the session & CSRF cookies
+# when the Vite dev server runs on a different port.
+CORS_ALLOW_CREDENTIALS = True
+
+# ---------------------------------------------------------------------------
+# Email — console backend in dev; configure SMTP vars in production .env
+# ---------------------------------------------------------------------------
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL",
+    default="CHPR Resources Hub <noreply@chprhealth.org>",
+)
+
+# Public URL for links inside emails (no trailing slash).
+SITE_URL = env("SITE_URL", default="http://localhost:5173")

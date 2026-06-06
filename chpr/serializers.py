@@ -1,9 +1,11 @@
 """DRF serializers for the CHPR Resources Hub API."""
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import ContactMessage, Project, Resource, ResourceComment, StaffProfile
+from .models import ContactMessage, Project, QuizQuestion, Resource, ResourceComment, StaffProfile
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -15,7 +17,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = [
             "id", "slug", "name", "short_name", "description",
             "color", "light_color", "status", "status_display",
-            "order", "resource_count", "created_at", "updated_at",
+            "order", "is_active", "resource_count", "created_at", "updated_at",
         ]
 
 
@@ -58,7 +60,7 @@ class ContactMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
         fields = ["id", "name", "email", "team", "message", "resource", "handled", "created_at"]
-        read_only_fields = ["handled", "created_at"]
+        read_only_fields = ["created_at"]
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +90,6 @@ class UserSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
 
     class Meta:
-        from django.contrib.auth.models import User
         model = User
         fields = ["id", "username", "email", "first_name", "last_name", "is_staff", "role"]
 
@@ -96,4 +97,78 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             return user.staff_profile.role
         except Exception:
-            return None
+            pass
+        # Django superusers created via createsuperuser have no StaffProfile —
+        # treat them as admins so the frontend shows the correct UI.
+        if user.is_superuser:
+            return StaffProfile.Role.ADMIN
+        return None
+
+
+class CreateUserSerializer(serializers.Serializer):
+    """Validated input for admin-created accounts."""
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    role = serializers.ChoiceField(choices=StaffProfile.Role.choices, default=StaffProfile.Role.STAFF)
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with that username already exists.")
+        return value
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Validated input for changing a user's own password."""
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        try:
+            validate_password(attrs["new_password"], self.context["request"].user)
+        except Exception as exc:
+            raise serializers.ValidationError({"new_password": list(exc.messages)})
+        return attrs
+
+
+# ---------------------------------------------------------------------------
+# Quiz serializers
+# ---------------------------------------------------------------------------
+
+class QuizQuestionAdminSerializer(serializers.ModelSerializer):
+    """Full serializer for admins — includes correct answer and explanation."""
+
+    class Meta:
+        model = QuizQuestion
+        fields = [
+            "id", "resource", "question",
+            "option_a", "option_b", "option_c", "option_d",
+            "correct", "explanation", "order",
+        ]
+
+
+class QuizQuestionPublicSerializer(serializers.ModelSerializer):
+    """Public serializer — omits correct answer and explanation."""
+
+    class Meta:
+        model = QuizQuestion
+        fields = [
+            "id", "resource", "question",
+            "option_a", "option_b", "option_c", "option_d",
+            "order",
+        ]
