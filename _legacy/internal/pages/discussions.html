@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Discussions — CHPR Internal</title>
+  <link rel="stylesheet" href="../css/internal.css"/>
+</head>
+<body class="light-theme">
+<div id="nav-placeholder"></div>
+
+<main class="main">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1>Discussions</h1>
+      <p>Internal threads for staff — ask questions, share updates, and collaborate.</p>
+    </div>
+    <div id="newPostBtn"></div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-label">Filter:</span>
+    <button class="filter-btn active" data-proj="all">All projects</button>
+    <button class="filter-btn" data-proj="breathe">BREATHE</button>
+    <button class="filter-btn" data-proj="prompttb">PROMPT TB</button>
+    <button class="filter-btn" data-proj="rapidtb">RAPID TB 2</button>
+    <button class="filter-btn" data-proj="general">General</button>
+  </div>
+
+  <div id="threadList"></div>
+</main>
+
+<!-- NEW POST MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Start a new discussion</h2>
+      <button class="modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input class="form-input" type="text" id="postTitle" placeholder="What do you want to discuss?"/>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Project</label>
+        <select class="form-select" id="postProject">
+          <option value="general">General</option>
+          <option value="breathe">BREATHE Cameroon</option>
+          <option value="prompttb">PROMPT TB</option>
+          <option value="rapidtb">RAPID TB 2</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Body</label>
+      <textarea class="form-textarea" id="postBody" placeholder="Describe the topic, question, or issue…"></textarea>
+    </div>
+
+    <div id="postError" style="font-size:13px;color:#f87171;display:none;margin-top:0.5rem"></div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-submit" onclick="submitPost()">Post discussion</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/internal.js"></script>
+<script>
+  const user = requireAuth("../index.html");
+  if (user) {
+    document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "discussions");
+    document.getElementById("footer-placeholder").innerHTML = renderInternalFooter();
+
+    const canPost = user.role === "admin" || user.role === "staff";
+    if (canPost) {
+      document.getElementById("newPostBtn").innerHTML = `
+        <button class="btn-new-post" onclick="openModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New discussion
+        </button>`;
+    }
+
+    // Auto-open modal if ?new=1
+    if (new URLSearchParams(window.location.search).get("new") === "1" && canPost) {
+      setTimeout(openModal, 200);
+    }
+
+    let activeProj = "all";
+
+    function renderThreads() {
+      const threads = getThreads().filter(t => activeProj === "all" || t.project === activeProj);
+      const list = document.getElementById("threadList");
+      if (threads.length === 0) {
+        list.innerHTML = `<div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <p>No threads yet in this category.</p>
+        </div>`;
+        return;
+      }
+      list.innerHTML = threads.map(t => `
+        <a href="thread.html?id=${t.id}" class="thread-card">
+          <div class="thread-top">
+            <span class="thread-title">${escapeHtml(t.title)}</span>
+            <div class="thread-tags">${renderTags(t.tags)}</div>
+          </div>
+          <div class="thread-excerpt">${escapeHtml(t.body)}</div>
+          <div class="thread-meta">
+            <div class="thread-meta-author">
+              ${avatarHtml(t.authorColor, t.authorInitials, 22)}
+              <span>${t.authorName}</span>
+              ${roleBadge(t.authorRole)}
+            </div>
+            <span class="thread-meta-sep">·</span>
+            <span>${timeAgo(t.date)}</span>
+            <span class="thread-meta-sep">·</span>
+            <span class="thread-meta-comments">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              ${t.comments.length} comment${t.comments.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </a>`).join("");
+    }
+
+    document.querySelectorAll("[data-proj]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        activeProj = btn.dataset.proj;
+        document.querySelectorAll("[data-proj]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderThreads();
+      });
+    });
+
+    renderThreads();
+
+    // Modal
+    window.openModal = function() {
+      document.getElementById("modalOverlay").classList.add("open");
+      setTimeout(() => document.getElementById("postTitle").focus(), 100);
+    };
+    window.closeModal = function() {
+      document.getElementById("modalOverlay").classList.remove("open");
+      document.getElementById("postTitle").value = "";
+      document.getElementById("postBody").value = "";
+      document.getElementById("postError").style.display = "none";
+    };
+    window.submitPost = function() {
+      const title = document.getElementById("postTitle").value.trim();
+      const body  = document.getElementById("postBody").value.trim();
+      const project = document.getElementById("postProject").value;
+      const err = document.getElementById("postError");
+      if (!title) { err.textContent = "Please enter a title."; err.style.display = "block"; return; }
+      if (!body)  { err.textContent = "Please enter a body.";  err.style.display = "block"; return; }
+      err.style.display = "none";
+
+      const thread = createThread({
+        title, body, project,
+        author: user.username,
+        authorName: user.name,
+        authorColor: user.color,
+        authorInitials: user.initials,
+        authorRole: user.role,
+      });
+      closeModal();
+      renderThreads();
+      // Navigate to the new thread
+      window.location.href = `thread.html?id=${thread.id}`;
+    };
+
+    // Close on overlay click
+    document.getElementById("modalOverlay").addEventListener("click", e => {
+      if (e.target === document.getElementById("modalOverlay")) closeModal();
+    });
+  }
+</script>
+</body>
+</html>

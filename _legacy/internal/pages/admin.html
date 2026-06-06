@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — CHPR Internal</title>
+  <link rel="stylesheet" href="../css/internal.css"/>
+</head>
+<body class="light-theme">
+<div id="nav-placeholder"></div>
+
+<main class="main">
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1>Administration</h1>
+      <p>Review registrations, manage staff, and maintain department templates.</p>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" data-tab="pending">
+      Pending <span class="admin-tab-count" id="countPending">0</span>
+    </button>
+    <button class="admin-tab" data-tab="approved">
+      Approved users <span class="admin-tab-count" id="countApproved">0</span>
+    </button>
+    <button class="admin-tab" data-tab="projects">
+      Projects <span class="admin-tab-count" id="countProjects">0</span>
+    </button>
+    <button class="admin-tab" data-tab="templates">
+      Templates <span class="admin-tab-count" id="countTemplates">0</span>
+    </button>
+    <button class="admin-tab" data-tab="outbox">
+      Sent emails <span class="admin-tab-count" id="countOutbox">0</span>
+    </button>
+  </div>
+
+  <div id="tabContent"></div>
+</main>
+
+<!-- TASK EDITOR MODAL (Templates) -->
+<div class="modal-overlay" id="taskEditorOverlay">
+  <div class="modal ob-editor-modal">
+    <div class="modal-header">
+      <h2>Edit task</h2>
+      <button class="modal-close" id="edClose" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="edBody"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="edCancel">Cancel</button>
+      <button class="btn-submit" id="edSave">Save task</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/internal.js"></script>
+<script>
+  const user = requireAuth("../index.html");
+  if (!user) { /* redirected */ }
+  else if (user.role !== "admin") {
+    window.location.href = "../../index.html";
+  } else {
+    document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "admin");
+    document.getElementById("footer-placeholder").innerHTML = renderInternalFooter();
+
+    let activeTab = "pending";
+    let tmplDept  = OB_DEPARTMENTS[0].key;       // selected department in the Templates editor
+    const TASK_CATEGORIES = ["Accounts & Access", "Orientation", "Compliance & Ethics", "Role-specific", "General"];
+
+    function refreshCounts() {
+      document.getElementById("countPending").textContent    = authGetPending().length;
+      document.getElementById("countApproved").textContent   = authGetUsers().length;
+      document.getElementById("countProjects").textContent   = PROJECT_DEFS.length;
+      document.getElementById("countTemplates").textContent  = OB_DEPARTMENTS.length;
+      document.getElementById("countOutbox").textContent     = authGetEmails().length;
+    }
+
+    function deptBadge(key) {
+      const c = obDepartmentColor(key);
+      return `<span class="ob-dept-badge" style="background:${c}1f;color:${c}">${obDepartmentLabel(key)}</span>`;
+    }
+
+    /* ---------- PENDING ---------- */
+    function renderPending() {
+      const list = authGetPending();
+      if (list.length === 0) {
+        return `<div class="admin-empty">No pending registrations. New requests will appear here for review.</div>`;
+      }
+      return list.map(p => `
+        <div class="user-row">
+          ${avatarHtml(p.color, p.initials, 40)}
+          <div class="user-row-info">
+            <div class="user-row-name">${escapeHtml(p.name)}</div>
+            <div class="user-row-meta">
+              <strong>@${escapeHtml(p.username)}</strong> · ${escapeHtml(p.email)} · requested ${timeAgo(p.registeredAt)}
+            </div>
+          </div>
+          <div class="user-row-actions">
+            <button class="btn-approve" data-action="approve" data-username="${escapeHtml(p.username)}">Approve</button>
+            <button class="btn-reject"  data-action="reject"  data-username="${escapeHtml(p.username)}">Reject</button>
+          </div>
+        </div>`).join("");
+    }
+
+    /* ---------- APPROVED ---------- */
+    function renderApproved() {
+      const list = authGetUsers();
+      if (list.length === 0) return `<div class="admin-empty">No approved users.</div>`;
+      return list.map(u => {
+        const rec = onboardingGet(u.username);
+        return `
+        <div class="user-row">
+          ${avatarHtml(u.color, u.initials, 40)}
+          <div class="user-row-info">
+            <div class="user-row-name">
+              ${escapeHtml(u.name)} ${roleBadge(u.role)}
+              ${rec ? deptBadge(rec.department) : ""}
+            </div>
+            <div class="user-row-meta">
+              <strong>@${escapeHtml(u.username)}</strong> · ${escapeHtml(u.email || "—")}
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    /* ---------- ONBOARDING ---------- */
+    function renderOnboarding() {
+      const assignable = onboardingAssignableUsers();
+      const mentors = onboardingMentorCandidates();
+      const enrolled = onboardingList();
+
+      const assignPanel = `
+        <div class="ob-assign">
+          <h3>Enrol a user in onboarding</h3>
+          ${assignable.length === 0
+            ? `<p class="ob-assign-empty">Every approved (non-admin) user is already enrolled. Approve more registrations to add new starters.</p>`
+            : `
+          <div class="ob-assign-grid">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">New employee</label>
+              <select class="form-select" id="assignUser">
+                ${assignable.map(u => `<option value="${escapeHtml(u.username)}">${escapeHtml(u.name)} (@${escapeHtml(u.username)})</option>`).join("")}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Department</label>
+              <select class="form-select" id="assignDept">
+                ${OB_DEPARTMENTS.map(d => `<option value="${d.key}">${d.label}</option>`).join("")}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Mentor</label>
+              <select class="form-select" id="assignMentor">
+                <option value="">— None —</option>
+                ${mentors.map(m => `<option value="${escapeHtml(m.username)}">${escapeHtml(m.name)} (${m.role})</option>`).join("")}
+              </select>
+            </div>
+            <button class="btn-submit" id="assignBtn">Enrol</button>
+          </div>
+          <div class="ob-assign-msg" id="assignMsg"></div>`}
+        </div>`;
+
+      const listMarkup = enrolled.length === 0
+        ? `<div class="admin-empty">No one is in onboarding yet. Enrol a user above to get started.</div>`
+        : enrolled.map(rec => {
+            const p = onboardingProgress(rec);
+            return `
+            <div class="ob-admin-row">
+              <div class="ob-admin-main">
+                ${avatarHtml(rec.color, rec.initials, 40)}
+                <div class="user-row-info">
+                  <div class="user-row-name">${escapeHtml(rec.name)} ${deptBadge(rec.department)}</div>
+                  <div class="user-row-meta">
+                    <strong>@${escapeHtml(rec.displayUsername)}</strong>
+                    · Mentor: ${rec.mentor ? escapeHtml(rec.mentor.name) : "—"}
+                    · started ${timeAgo(rec.startDate)}
+                  </div>
+                </div>
+                <div class="user-row-actions">
+                  <a class="btn-view" href="onboarding.html?user=${encodeURIComponent(rec.displayUsername)}">View page</a>
+                  <button class="btn-reject" data-ob-remove="${escapeHtml(rec.displayUsername)}">Remove</button>
+                </div>
+              </div>
+              <div class="ob-admin-progress">
+                <div class="ob-bar"><i style="width:${p.percent}%"></i></div>
+                <span>${p.done}/${p.total} tasks · ${p.percent}%</span>
+              </div>
+            </div>`;
+          }).join("");
+
+      return assignPanel + listMarkup;
+    }
+
+    /* ---------- PROJECTS (active / completed) ---------- */
+    function renderProjects() {
+      const statuses = getProjectStatuses();
+      const rows = PROJECT_DEFS.map(p => {
+        const st = statuses[p.id];
+        return `
+          <div class="proj-admin-row">
+            <div class="proj-admin-main">
+              <span class="proj-admin-mark" style="background:${p.color}1f;color:${p.color}">${escapeHtml(p.short)}</span>
+              <div class="user-row-info">
+                <div class="user-row-name">
+                  ${escapeHtml(p.name)}
+                  <span class="proj-status-badge proj-status-${st}">${st === "completed" ? "Completed" : "Active"}</span>
+                </div>
+                <div class="user-row-meta">Project ID: <strong>${escapeHtml(p.id)}</strong></div>
+              </div>
+            </div>
+            <div class="proj-admin-actions" role="group" aria-label="Status for ${escapeHtml(p.name)}">
+              <button class="proj-status-btn ${st === "active" ? "active" : ""}" data-proj-status="${p.id}:active">Active</button>
+              <button class="proj-status-btn ${st === "completed" ? "active" : ""}" data-proj-status="${p.id}:completed">Completed</button>
+            </div>
+          </div>`;
+      }).join("");
+
+      return `
+        <p class="ob-tmpl-intro">Mark each programme as <strong>Active</strong> or <strong>Completed</strong>. This status is shown on the public hub's project cards and project pages.</p>
+        <div class="proj-admin-list">${rows}</div>`;
+    }
+
+    /* ---------- TEMPLATES ---------- */
+    function renderTemplates() {
+      const tmpl = obGetTemplate(tmplDept);
+      const pills = `
+        <div class="ob-dept-pills">
+          ${OB_DEPARTMENTS.map(d => `<button class="ob-dept-pill ${d.key === tmplDept ? "active" : ""}" data-dept="${d.key}">${d.label}</button>`).join("")}
+        </div>`;
+
+      const tasks = `
+        <section class="ob-tmpl-section">
+          <div class="ob-section-head"><h3 class="ob-section-title">Onboarding tasks (${tmpl.tasks.length})</h3></div>
+          ${tmpl.tasks.length === 0 ? `<p class="ob-tmpl-empty">No tasks yet — add the first one below.</p>` : ""}
+          ${tmpl.tasks.map(t => `
+            <div class="ob-tmpl-item">
+              <div class="ob-tmpl-item-info">
+                <div class="ob-tmpl-item-title">
+                  <span class="ob-cat">${escapeHtml(t.category || "General")}</span> ${escapeHtml(t.title)}
+                  ${t.quiz && t.quiz.length ? `<span class="ob-flag ob-flag-quiz">Quiz · ${t.quiz.length}</span>` : ""}
+                  ${t.resources && t.resources.length ? `<span class="ob-flag">${t.resources.length} link${t.resources.length !== 1 ? "s" : ""}</span>` : ""}
+                </div>
+                ${t.desc ? `<div class="ob-tmpl-item-desc">${escapeHtml(t.desc)}</div>` : ""}
+              </div>
+              <div class="ob-tmpl-item-actions">
+                <button class="ob-mini-edit" data-tmpl-edit="${t.id}">Edit details</button>
+                <button class="ob-mini-del" data-tmpl-task="${t.id}" title="Remove task">&times;</button>
+              </div>
+            </div>`).join("")}
+          <div class="ob-add-form">
+            <input class="form-input" id="tmplTaskTitle" placeholder="New task title"/>
+            <select class="form-select" id="tmplTaskCat">
+              ${TASK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join("")}
+            </select>
+            <input class="form-input" id="tmplTaskDesc" placeholder="Short description (optional)"/>
+            <button class="btn-submit" id="tmplTaskAdd">Add task</button>
+          </div>
+        </section>`;
+
+      const resources = `
+        <section class="ob-tmpl-section">
+          <div class="ob-section-head"><h3 class="ob-section-title">Training & resources (${tmpl.resources.length})</h3></div>
+          ${tmpl.resources.length === 0 ? `<p class="ob-tmpl-empty">No resources yet — add the first one below.</p>` : ""}
+          ${tmpl.resources.map(r => `
+            <div class="ob-tmpl-item">
+              <div class="ob-tmpl-item-info">
+                <div class="ob-tmpl-item-title">
+                  <span class="ob-type ob-type-${r.type}">${obResourceTypeLabel(r.type)}</span>
+                  ${escapeHtml(r.title)}
+                  ${r.url ? `<a class="ob-tmpl-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">link ↗</a>` : ""}
+                </div>
+                ${r.desc ? `<div class="ob-tmpl-item-desc">${escapeHtml(r.desc)}</div>` : ""}
+              </div>
+              <button class="ob-mini-del" data-tmpl-res="${r.id}" title="Remove resource">&times;</button>
+            </div>`).join("")}
+          <div class="ob-add-form">
+            <input class="form-input" id="tmplResTitle" placeholder="Resource / training title"/>
+            <select class="form-select" id="tmplResType">
+              ${OB_RESOURCE_TYPES.map(t => `<option value="${t.key}">${t.label}</option>`).join("")}
+            </select>
+            <input class="form-input" id="tmplResUrl" placeholder="Link / file URL (optional)"/>
+            <input class="form-input" id="tmplResDesc" placeholder="Short description (optional)"/>
+            <button class="btn-submit" id="tmplResAdd">Add resource</button>
+          </div>
+        </section>`;
+
+      return `<p class="ob-tmpl-intro">Tasks and resources defined here are copied to each new employee when you enrol them in this department.</p>
+        ${pills}${tasks}${resources}`;
+    }
+
+    /* ---------- OUTBOX ---------- */
+    function renderOutbox() {
+      const list = authGetEmails();
+      if (list.length === 0) return `<div class="admin-empty">No notifications have been sent yet.</div>`;
+      return list.map(m => `
+        <div class="outbox-row">
+          <div class="outbox-head">
+            <div class="outbox-subject">${escapeHtml(m.subject)}</div>
+            <div class="outbox-time">${new Date(m.sentAt).toLocaleString()}</div>
+          </div>
+          <div class="outbox-to"><strong>To:</strong> ${escapeHtml(m.to)}</div>
+          <div class="outbox-body">${escapeHtml(m.body)}</div>
+        </div>`).join("");
+    }
+
+    /* ---------- DISPATCH + WIRING ---------- */
+    function refreshNav() {
+      document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "admin");
+    }
+
+    function render() {
+      refreshCounts();
+      const target = document.getElementById("tabContent");
+      if (activeTab === "pending")    target.innerHTML = renderPending();
+      if (activeTab === "approved")   target.innerHTML = renderApproved();
+      if (activeTab === "projects")   target.innerHTML = renderProjects();
+      if (activeTab === "templates")  target.innerHTML = renderTemplates();
+      if (activeTab === "outbox")     target.innerHTML = renderOutbox();
+      wire(target);
+    }
+
+    function wire(target) {
+      // Projects: set active / completed status
+      target.querySelectorAll("button[data-proj-status]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const [id, status] = btn.dataset.projStatus.split(":");
+          setProjectStatus(id, status);
+          const proj = PROJECT_DEFS.find(p => p.id === id);
+          render();
+          if (typeof showToast === "function") {
+            showToast(`${proj ? proj.name : id} marked ${status}.`);
+          }
+        });
+      });
+
+      // Pending approve / reject
+      target.querySelectorAll("button[data-action]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const username = btn.dataset.username;
+          if (btn.dataset.action === "approve") {
+            authApprove(username);
+          } else {
+            const reason = prompt("Optional reason for rejecting this account (will be included in the email):", "");
+            if (reason === null) return;
+            authReject(username, reason);
+          }
+          render();
+          refreshNav();
+        });
+      });
+
+      // Onboarding: enrol
+      const assignBtn = target.querySelector("#assignBtn");
+      if (assignBtn) {
+        assignBtn.addEventListener("click", () => {
+          const username = target.querySelector("#assignUser").value;
+          const department = target.querySelector("#assignDept").value;
+          const mentorUsername = target.querySelector("#assignMentor").value;
+          const msg = target.querySelector("#assignMsg");
+          const res = onboardingAssign(username, { department, mentorUsername, assignedBy: user.username });
+          if (!res.ok) {
+            msg.textContent = res.message;
+            msg.className = "ob-assign-msg error";
+            return;
+          }
+          render();
+          refreshNav();
+        });
+      }
+
+      // Onboarding: remove
+      target.querySelectorAll("button[data-ob-remove]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const username = btn.dataset.obRemove;
+          if (!confirm(`Remove ${username} from onboarding? Their progress will be deleted.`)) return;
+          onboardingRemove(username);
+          render();
+          refreshNav();
+        });
+      });
+
+      // Templates: switch department
+      target.querySelectorAll(".ob-dept-pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+          tmplDept = pill.dataset.dept;
+          render();
+        });
+      });
+
+      // Templates: add task
+      const taskAdd = target.querySelector("#tmplTaskAdd");
+      if (taskAdd) {
+        taskAdd.addEventListener("click", () => {
+          const title = target.querySelector("#tmplTaskTitle").value;
+          const category = target.querySelector("#tmplTaskCat").value;
+          const desc = target.querySelector("#tmplTaskDesc").value;
+          const res = obTemplateAddTask(tmplDept, { title, category, desc });
+          if (!res.ok) { alert(res.message); return; }
+          render();
+        });
+      }
+
+      // Templates: remove task
+      target.querySelectorAll("button[data-tmpl-task]").forEach(btn => {
+        btn.addEventListener("click", () => { obTemplateRemoveTask(tmplDept, btn.dataset.tmplTask); render(); });
+      });
+
+      // Templates: add resource
+      const resAdd = target.querySelector("#tmplResAdd");
+      if (resAdd) {
+        resAdd.addEventListener("click", () => {
+          const title = target.querySelector("#tmplResTitle").value;
+          const type = target.querySelector("#tmplResType").value;
+          const url = target.querySelector("#tmplResUrl").value;
+          const desc = target.querySelector("#tmplResDesc").value;
+          const res = obTemplateAddResource(tmplDept, { title, type, url, desc });
+          if (!res.ok) { alert(res.message); return; }
+          render();
+        });
+      }
+
+      // Templates: remove resource
+      target.querySelectorAll("button[data-tmpl-res]").forEach(btn => {
+        btn.addEventListener("click", () => { obTemplateRemoveResource(tmplDept, btn.dataset.tmplRes); render(); });
+      });
+
+      // Templates: open the task content / quiz editor
+      target.querySelectorAll("button[data-tmpl-edit]").forEach(btn => {
+        btn.addEventListener("click", () => openTaskEditor(btn.dataset.tmplEdit));
+      });
+    }
+
+    /* ---------- TASK EDITOR (details, helper links, quiz) ---------- */
+    let editor = null;
+
+    function openTaskEditor(taskId) {
+      const t = obTemplateGetTask(tmplDept, taskId);
+      if (!t) return;
+      editor = {
+        dept: tmplDept, taskId,
+        title: t.title || "", category: t.category || "General",
+        desc: t.desc || "", details: t.details || "",
+        resources: JSON.parse(JSON.stringify(t.resources || [])),
+        quiz: JSON.parse(JSON.stringify(t.quiz || [])),
+      };
+      renderEditor();
+      document.getElementById("taskEditorOverlay").classList.add("open");
+    }
+    function closeTaskEditor() {
+      document.getElementById("taskEditorOverlay").classList.remove("open");
+      editor = null;
+    }
+
+    // Read every input back into the editor object (called before structural changes + save)
+    function syncEditorFromDOM() {
+      if (!editor) return;
+      const g = id => document.getElementById(id);
+      if (g("edTitle"))   editor.title = g("edTitle").value;
+      if (g("edCat"))     editor.category = g("edCat").value;
+      if (g("edDesc"))    editor.desc = g("edDesc").value;
+      if (g("edDetails")) editor.details = g("edDetails").value;
+      editor.resources = Array.from(document.querySelectorAll("#edResList .ed-res")).map(row => ({
+        title: row.querySelector(".ed-res-title").value,
+        type:  row.querySelector(".ed-res-type").value,
+        url:   row.querySelector(".ed-res-url").value,
+      }));
+      editor.quiz = Array.from(document.querySelectorAll("#edQList .ed-q")).map(block => {
+        const qi = block.dataset.qi;
+        const checked = block.querySelector(`input[name="correct-${qi}"]:checked`);
+        return {
+          q: block.querySelector(".ed-q-text").value,
+          options: Array.from(block.querySelectorAll(".ed-opt-text")).map(i => i.value),
+          answer: checked ? Number(checked.value) : 0,
+        };
+      });
+    }
+
+    function renderEditor() {
+      if (!editor) return;
+      const body = document.getElementById("edBody");
+      body.innerHTML = `
+        <div class="form-group">
+          <label class="form-label">Task title</label>
+          <input class="form-input" id="edTitle" value="${escapeHtml(editor.title)}"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="edCat">
+            ${TASK_CATEGORIES.map(c => `<option value="${c}" ${c === editor.category ? "selected" : ""}>${c}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Brief description</label>
+          <textarea class="form-textarea" id="edDesc" style="min-height:64px">${escapeHtml(editor.desc)}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Details — how to complete this task</label>
+          <textarea class="form-textarea" id="edDetails" style="min-height:110px">${escapeHtml(editor.details)}</textarea>
+        </div>
+
+        <div class="ed-subhead"><span>Helper resources — videos & website links</span>
+          <button class="ed-add-btn" id="edAddRes" type="button">+ Add resource</button></div>
+        <div id="edResList">
+          ${editor.resources.length === 0 ? `<p class="ed-empty">No helper resources yet.</p>` : ""}
+          ${editor.resources.map((r, i) => `
+            <div class="ed-res" data-i="${i}">
+              <input class="form-input ed-res-title" placeholder="Title" value="${escapeHtml(r.title || "")}"/>
+              <select class="form-select ed-res-type">
+                ${OB_RESOURCE_TYPES.map(t => `<option value="${t.key}" ${t.key === r.type ? "selected" : ""}>${t.label}</option>`).join("")}
+              </select>
+              <input class="form-input ed-res-url" placeholder="https:// link or file URL" value="${escapeHtml(r.url || "")}"/>
+              <button class="ob-mini-del" type="button" data-ed-res-del="${i}" title="Remove">&times;</button>
+            </div>`).join("")}
+        </div>
+
+        <div class="ed-subhead"><span>Test your understanding — quiz (optional)</span>
+          <button class="ed-add-btn" id="edAddQ" type="button">+ Add question</button></div>
+        <p class="ed-hint">If a task has questions, the employee must answer them all correctly within 3 attempts; the task then completes automatically.</p>
+        <div id="edQList">
+          ${editor.quiz.length === 0 ? `<p class="ed-empty">No questions — this task is completed manually by the employee.</p>` : ""}
+          ${editor.quiz.map((q, qi) => `
+            <div class="ed-q" data-qi="${qi}">
+              <div class="ed-q-head">
+                <span class="ed-q-num">Q${qi + 1}</span>
+                <input class="form-input ed-q-text" placeholder="Question" value="${escapeHtml(q.q || "")}"/>
+                <button class="ob-mini-del" type="button" data-ed-q-del="${qi}" title="Remove question">&times;</button>
+              </div>
+              <div class="ed-opts">
+                ${(q.options || []).map((o, oi) => `
+                  <div class="ed-opt">
+                    <input type="radio" name="correct-${qi}" value="${oi}" ${Number(q.answer) === oi ? "checked" : ""} title="Mark as the correct answer"/>
+                    <input class="form-input ed-opt-text" placeholder="Option ${oi + 1}" value="${escapeHtml(o || "")}"/>
+                    ${(q.options.length > 2) ? `<button class="ob-mini-del" type="button" data-ed-opt-del="${qi}:${oi}" title="Remove option">&times;</button>` : ""}
+                  </div>`).join("")}
+              </div>
+              <button class="ed-add-opt" type="button" data-ed-add-opt="${qi}">+ Add option</button>
+              <div class="ed-q-hint">Select the radio button beside the correct answer.</div>
+            </div>`).join("")}
+        </div>`;
+
+      body.querySelector("#edAddRes").addEventListener("click", () => { syncEditorFromDOM(); editor.resources.push({ title: "", type: "link", url: "" }); renderEditor(); });
+      body.querySelector("#edAddQ").addEventListener("click", () => { syncEditorFromDOM(); editor.quiz.push({ q: "", options: ["", ""], answer: 0 }); renderEditor(); });
+      body.querySelectorAll("[data-ed-res-del]").forEach(b => b.addEventListener("click", () => { syncEditorFromDOM(); editor.resources.splice(Number(b.dataset.edResDel), 1); renderEditor(); }));
+      body.querySelectorAll("[data-ed-q-del]").forEach(b => b.addEventListener("click", () => { syncEditorFromDOM(); editor.quiz.splice(Number(b.dataset.edQDel), 1); renderEditor(); }));
+      body.querySelectorAll("[data-ed-add-opt]").forEach(b => b.addEventListener("click", () => { syncEditorFromDOM(); editor.quiz[Number(b.dataset.edAddOpt)].options.push(""); renderEditor(); }));
+      body.querySelectorAll("[data-ed-opt-del]").forEach(b => b.addEventListener("click", () => {
+        syncEditorFromDOM();
+        const [qi, oi] = b.dataset.edOptDel.split(":").map(Number);
+        editor.quiz[qi].options.splice(oi, 1);
+        if (editor.quiz[qi].answer >= editor.quiz[qi].options.length) editor.quiz[qi].answer = 0;
+        renderEditor();
+      }));
+    }
+
+    function saveTaskEditor() {
+      syncEditorFromDOM();
+      if (!editor.title.trim()) { alert("Task title is required."); return; }
+
+      const quiz = [];
+      for (const q of editor.quiz) {
+        const text = (q.q || "").trim();
+        const opts = (q.options || []).map(o => (o || "").trim());
+        if (!text && opts.every(o => o === "")) continue;       // skip a blank question block
+        if (!text) { alert("Every question needs question text (or remove it)."); return; }
+        if (opts.length < 2 || opts.some(o => o === "")) { alert("Each question needs at least 2 options with no blanks."); return; }
+        let answer = Number(q.answer) || 0;
+        if (answer >= opts.length) answer = 0;
+        quiz.push({ q: text, options: opts, answer });
+      }
+      const resources = editor.resources
+        .map(r => ({ title: (r.title || "").trim(), type: r.type || "link", url: (r.url || "").trim() }))
+        .filter(r => r.title !== "");
+
+      const res = obTemplateUpdateTask(editor.dept, editor.taskId, {
+        title: editor.title, category: editor.category, desc: editor.desc,
+        details: editor.details, resources, quiz,
+      });
+      if (!res.ok) { alert(res.message); return; }
+      closeTaskEditor();
+      render();
+    }
+
+    document.getElementById("edClose").addEventListener("click", closeTaskEditor);
+    document.getElementById("edCancel").addEventListener("click", closeTaskEditor);
+    document.getElementById("edSave").addEventListener("click", saveTaskEditor);
+    document.getElementById("taskEditorOverlay").addEventListener("click", e => {
+      if (e.target === document.getElementById("taskEditorOverlay")) closeTaskEditor();
+    });
+
+    document.querySelectorAll(".admin-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        activeTab = tab.dataset.tab;
+        render();
+      });
+    });
+
+    render();
+  }
+</script>
+</body>
+</html>

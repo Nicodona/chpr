@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Search — CHPR Resources Hub</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .search-page-bar {
+      display: flex;
+      align-items: center;
+      background: var(--white);
+      border: 2px solid var(--primary);
+      border-radius: 10px;
+      padding: 0 16px;
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+    .search-page-bar input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      color: var(--dark);
+      padding: 14px 0;
+      background: transparent;
+    }
+    .search-page-bar button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 18px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .result-project-group { margin-bottom: 2rem; }
+    .result-group-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+      padding-left: 4px;
+    }
+    mark {
+      background: #fff3b0;
+      color: var(--dark);
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="nav-placeholder"></div>
+
+<main class="main">
+  <a href="../index.html" class="back-link" data-i18n="common.backToHub">← Back to Hub</a>
+
+  <!-- SEARCH BAR -->
+  <div class="search-page-bar">
+    <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="Search resources, projects, material types…" autocomplete="off"/>
+    <button onclick="doSearch()" data-i18n="search.btn">Search</button>
+  </div>
+
+  <div id="searchResultsHeader" class="search-results-header"></div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar" id="filterBar" style="display:none">
+    <span class="filter-label" data-i18n="common.filter">Filter:</span>
+    <button class="filter-btn active" data-type="all" data-i18n="common.allTypes">All types</button>
+    <button class="filter-btn" data-type="alg" data-i18n="filter.algorithms">Algorithms</button>
+    <button class="filter-btn" data-type="job" data-i18n="filter.jobAids">Job Aids</button>
+    <button class="filter-btn" data-type="vid" data-i18n="filter.videos">Videos</button>
+    <button class="filter-btn" data-type="pos" data-i18n="filter.posters">Posters</button>
+    <button class="filter-btn" data-type="expert" data-i18n="filter.expert">Expert Pool</button>
+    <button class="filter-btn" data-type="trunat" data-i18n="filter.trunat">Trunat</button>
+    <button class="filter-btn" data-type="hiv" data-i18n="filter.hiv">HIV Pool</button>
+  </div>
+
+  <div id="resultsArea"></div>
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/i18n.js"></script>
+<script src="../js/data.js"></script>
+<script>
+  document.getElementById("nav-placeholder").innerHTML = renderNav("");
+  document.getElementById("footer-placeholder").innerHTML = renderFooter();
+  applyI18n();
+
+  // Override nav search to update this page
+  const navInput = document.getElementById("navSearchInput");
+  if (navInput) {
+    navInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && navInput.value.trim()) {
+        window.location.href = `search.html?q=${encodeURIComponent(navInput.value.trim())}`;
+      }
+    });
+  }
+
+  let currentQuery = "";
+  let activeType = "all";
+
+  function highlight(text, query) {
+    if (!query) return text;
+    const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+    return text.replace(re, "<mark>$1</mark>");
+  }
+
+  function doSearch(q) {
+    const input = document.getElementById("searchInput");
+    currentQuery = (q || input.value || "").trim();
+    if (currentQuery) input.value = currentQuery;
+
+    // Update URL
+    const url = new URL(window.location);
+    url.searchParams.set("q", currentQuery);
+    window.history.replaceState({}, "", url);
+
+    renderResults();
+  }
+
+  function renderResults() {
+    const header = document.getElementById("searchResultsHeader");
+    const area = document.getElementById("resultsArea");
+    const filterBar = document.getElementById("filterBar");
+
+    if (!currentQuery) {
+      header.innerHTML = `<h2>${t("search.heading")}</h2><p>${t("search.prompt")}</p>`;
+      area.innerHTML = "";
+      filterBar.style.display = "none";
+      return;
+    }
+
+    const q = currentQuery.toLowerCase();
+    let matches = RESOURCES.filter(r => {
+      const text = `${r.name} ${r.projectName} ${r.type} ${typeLabel(r.typeKey)}`.toLowerCase();
+      const typeMatch = activeType === "all" || r.typeKey === activeType;
+      return text.includes(q) && typeMatch;
+    });
+
+    const projCount = [...new Set(matches.map(r => r.project))].length;
+    const projStr = t(projCount === 1 ? "search.projects_one" : "search.projects_other", { n: projCount });
+    header.innerHTML = `
+      <h2>${t("search.resultsFor")} "<em>${currentQuery}</em>"</h2>
+      <p>${t("search.foundSummary", { res: tCount(matches.length), proj: projStr })}</p>`;
+
+    filterBar.style.display = matches.length > 0 ? "flex" : "none";
+
+    if (matches.length === 0) {
+      area.innerHTML = `<div class="empty-state" style="margin-top:2rem"><p>${t("search.noMatch")} "<strong>${currentQuery}</strong>". ${t("search.tryDifferent")}</p></div>`;
+      return;
+    }
+
+    // Group by project
+    const byProject = {};
+    matches.forEach(r => {
+      if (!byProject[r.project]) byProject[r.project] = [];
+      byProject[r.project].push(r);
+    });
+
+    let html = "";
+    Object.entries(byProject).forEach(([projId, items]) => {
+      const proj = PROJECTS.find(p => p.id === projId);
+      const matchStr = t(items.length === 1 ? "search.matches_one" : "search.matches_other", { n: items.length });
+      html += `<div class="result-project-group">
+        <div class="result-group-label">${proj?.name || projId} · ${matchStr}</div>
+        ${renderResourceTiles(items, false)}
+      </div>`;
+    });
+    area.innerHTML = html;
+  }
+
+  // Filter buttons
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeType = btn.dataset.type;
+      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderResults();
+    });
+  });
+
+  // Enter key on search input
+  document.getElementById("searchInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") doSearch();
+  });
+
+  // Load from URL on page open
+  const urlQ = new URLSearchParams(window.location.search).get("q") || "";
+  if (urlQ) doSearch(urlQ);
+  else {
+    document.getElementById("searchResultsHeader").innerHTML = `<h2>${t("search.heading")}</h2><p>${t("search.prompt")}</p>`;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# CHPR Resources Hub — backend dependencies
+Django>=5.2,<7.0
+djangorestframework>=3.15
+drf-spectacular>=0.27          # OpenAPI schema + Swagger UI / ReDoc
+django-cors-headers>=4.4
+django-environ>=0.11
+psycopg[binary]>=3.2          # PostgreSQL driver (psycopg 3)
+whitenoise>=6.7               # serves the React build's static assets
+gunicorn>=22.0                # production WSGI server (optional for local dev)

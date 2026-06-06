@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Onboarding — CHPR Internal</title>
+  <link rel="stylesheet" href="../css/internal.css"/>
+</head>
+<body class="light-theme">
+<div id="nav-placeholder"></div>
+
+<main class="main" id="obMain"></main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/internal.js"></script>
+<script>
+  const user = requireAuth("../index.html");
+  if (user) {
+    document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "onboarding");
+    document.getElementById("footer-placeholder").innerHTML = renderInternalFooter();
+
+    // Admins may preview another user's onboarding via ?user=<username>
+    const params = new URLSearchParams(location.search);
+    const requested = params.get("user");
+    const isAdmin = user.role === "admin";
+    const targetName = (isAdmin && requested) ? requested : user.username;
+    const adminPreview = isAdmin && !!requested && requested.toLowerCase() !== user.username.toLowerCase();
+
+    const checkSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    function detailHref(taskId) {
+      return `onboarding-task.html?task=${encodeURIComponent(taskId)}` + (adminPreview ? `&user=${encodeURIComponent(requested)}` : "");
+    }
+    function refreshNav() {
+      document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "onboarding");
+    }
+
+    function groupByCategory(tasks) {
+      const order = [];
+      const map = {};
+      tasks.forEach(t => {
+        const c = t.category || "General";
+        if (!map[c]) { map[c] = []; order.push(c); }
+        map[c].push(t);
+      });
+      return order.map(c => ({ category: c, tasks: map[c] }));
+    }
+
+    function resourceRow(r) {
+      return `
+        <div class="ob-resource">
+          <div class="ob-resource-info">
+            <div class="ob-resource-title">
+              <span class="ob-type ob-type-${r.type}">${obResourceTypeLabel(r.type)}</span>
+              ${escapeHtml(r.title)}
+            </div>
+            ${r.desc ? `<div class="ob-resource-desc">${escapeHtml(r.desc)}</div>` : ""}
+          </div>
+          ${r.url ? `<a class="ob-open" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">Open ↗</a>` : `<span class="ob-soon">Coming soon</span>`}
+        </div>`;
+    }
+
+    function render() {
+      const rec = onboardingGet(targetName);
+      const main = document.getElementById("obMain");
+
+      if (!rec) {
+        main.innerHTML = adminPreview
+          ? `<a class="back-link" href="admin.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Back to admin</a>
+             <div class="admin-empty">No onboarding record found for “${escapeHtml(targetName)}”.</div>`
+          : `<div class="page-header"><div class="page-header-left"><h1>Onboarding</h1></div></div>
+             <div class="empty-state"><p>You're not currently enrolled in an onboarding programme. Your administrator will assign you to a department when you start.</p></div>`;
+        return;
+      }
+
+      const p = onboardingProgress(rec);
+      const deptColor = obDepartmentColor(rec.department);
+      const days = Math.max(0, Math.floor((Date.now() - new Date(rec.startDate).getTime()) / 86400000));
+      const groups = groupByCategory(obResolveTasks(rec));
+
+      const previewBanner = adminPreview
+        ? `<a class="back-link" href="admin.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Back to admin</a>
+           <div class="ob-preview-banner">Admin preview — viewing <strong>${escapeHtml(rec.name)}</strong>'s onboarding. Changes you make here apply to their checklist.</div>`
+        : "";
+
+      const hero = `
+        <div class="ob-hero">
+          <div>
+            <h2>${adminPreview ? escapeHtml(rec.name) + "'s onboarding" : "Welcome aboard, " + escapeHtml(rec.name.split(" ")[0]) + "!"}</h2>
+            <p>${p.done === p.total && p.total > 0 ? "All onboarding tasks complete — great work!" : "Work through your checklist below to get fully set up."}</p>
+            <div class="ob-hero-badges">
+              <span class="ob-hero-badge" style="background:${deptColor}">${obDepartmentLabel(rec.department)}</span>
+              ${rec.mentor ? `<span class="ob-hero-badge">Mentor: ${escapeHtml(rec.mentor.name)}</span>` : ""}
+            </div>
+          </div>
+          <div class="ob-ring" style="--pct:${p.percent}">
+            <div class="ob-ring-inner"><b>${p.percent}%</b><span>Complete</span></div>
+          </div>
+        </div>`;
+
+      const stats = `
+        <div class="ob-stats">
+          <div class="ob-stat"><b>${p.done}/${p.total}</b><span>Tasks completed</span></div>
+          <div class="ob-stat"><b>${p.percent}%</b><span>Overall progress</span></div>
+          <div class="ob-stat"><b>${rec.resources.length}</b><span>Training & resources</span></div>
+          <div class="ob-stat"><b>${days}</b><span>Day${days === 1 ? "" : "s"} in onboarding</span></div>
+        </div>`;
+
+      const mentor = `
+        <div class="ob-section">
+          <div class="ob-section-head"><h3 class="ob-section-title">Your mentor</h3></div>
+          ${rec.mentor ? `
+            <div class="ob-mentor">
+              ${avatarHtml(rec.mentor.color, rec.mentor.initials, 44)}
+              <div class="ob-mentor-info">
+                <div class="ob-mentor-name">${escapeHtml(rec.mentor.name)}</div>
+                <div class="ob-mentor-role">Onboarding mentor · ${obDepartmentLabel(rec.department)}</div>
+              </div>
+              ${rec.mentor.email ? `<a href="mailto:${escapeHtml(rec.mentor.email)}">${escapeHtml(rec.mentor.email)}</a>` : ""}
+            </div>`
+            : `<div class="ob-mentor"><div class="ob-mentor-info"><div class="ob-mentor-role">No mentor assigned yet.</div></div></div>`}
+        </div>`;
+
+      const tasks = `
+        <div class="ob-section">
+          <div class="ob-section-head">
+            <h3 class="ob-section-title">Onboarding tasks</h3>
+            <span class="ob-section-meta">${p.done} of ${p.total} done</span>
+          </div>
+          ${groups.map(g => `
+            <div class="ob-task-group">
+              <h4>${escapeHtml(g.category)}</h4>
+              ${g.tasks.map(t => {
+                const hasQuiz = t.quiz && t.quiz.length;
+                return `
+                <div class="ob-task ${t.done ? "done" : ""}" data-task="${t.id}" data-quiz="${hasQuiz ? 1 : 0}">
+                  <div class="ob-check" data-toggle="${t.id}">${checkSvg}</div>
+                  <div class="ob-task-text">
+                    <div class="ob-task-title">${escapeHtml(t.title)}${hasQuiz ? ` <span class="ob-quiz-chip">Quiz</span>` : ""}</div>
+                    ${t.desc ? `<div class="ob-task-desc">${escapeHtml(t.desc)}</div>` : ""}
+                  </div>
+                  <span class="ob-task-arrow">Details ›</span>
+                  ${adminPreview ? `<button class="ob-task-remove" data-remove-task="${t.id}" title="Remove task">&times;</button>` : ""}
+                </div>`;
+              }).join("")}
+            </div>`).join("")}
+          ${adminPreview ? `
+            <div class="ob-add-form">
+              <input class="form-input" id="obAddTitle" placeholder="Add a custom task for ${escapeHtml(rec.name.split(" ")[0])}"/>
+              <input class="form-input" id="obAddDesc" placeholder="Short description (optional)"/>
+              <button class="btn-submit" id="obAddBtn">Add task</button>
+            </div>` : ""}
+        </div>`;
+
+      const resources = `
+        <div class="ob-section">
+          <div class="ob-section-head"><h3 class="ob-section-title">Training & resources</h3></div>
+          ${rec.resources.length === 0
+            ? `<div class="empty-state"><p>No training materials assigned yet.</p></div>`
+            : rec.resources.map(resourceRow).join("")}
+        </div>`;
+
+      main.innerHTML = previewBanner + hero + stats + mentor + tasks + resources;
+      wire();
+    }
+
+    function wire() {
+      // Each task row opens its detail page; non-quiz tasks can also be ticked
+      // off directly via the checkbox. Quiz tasks complete only by passing the quiz.
+      document.querySelectorAll(".ob-task").forEach(row => {
+        const id = row.dataset.task;
+        const hasQuiz = row.dataset.quiz === "1";
+        row.addEventListener("click", e => {
+          if (e.target.closest("[data-remove-task]")) return;          // remove handled separately
+          if (e.target.closest("[data-toggle]") && !hasQuiz) return;   // toggle handled separately
+          location.href = detailHref(id);
+        });
+        if (!hasQuiz) {
+          const chk = row.querySelector("[data-toggle]");
+          if (chk) chk.addEventListener("click", e => {
+            e.stopPropagation();
+            onboardingToggleTask(targetName, id);
+            render();
+            if (!adminPreview) refreshNav();
+          });
+        }
+      });
+
+      if (adminPreview) {
+        document.querySelectorAll("[data-remove-task]").forEach(btn => {
+          btn.addEventListener("click", e => {
+            e.stopPropagation();
+            onboardingRemoveTask(targetName, btn.dataset.removeTask);
+            render();
+          });
+        });
+        const addBtn = document.getElementById("obAddBtn");
+        if (addBtn) {
+          addBtn.addEventListener("click", () => {
+            const title = document.getElementById("obAddTitle").value;
+            const desc = document.getElementById("obAddDesc").value;
+            const res = onboardingAddTask(targetName, { title, desc });
+            if (!res.ok) { alert(res.message); return; }
+            render();
+          });
+        }
+      }
+    }
+
+    render();
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CHPR Resources Hub</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="nav-placeholder"></div>
+
+<!-- HERO (minimal — search + quick access tiles only) -->
+<section class="hero-minimal">
+  <div class="hero-minimal-inner">
+    <div class="hero-search">
+      <svg class="hero-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="heroSearch" data-i18n-placeholder="home.searchPlaceholder" placeholder="Search resources, projects, or material types…" autocomplete="off"/>
+      <button type="button" class="hero-search-btn" id="heroSearchBtn" data-i18n="home.searchBtn">Search</button>
+    </div>
+
+    <div class="hero-tiles">
+      <a href="pages/all-resources.html" class="hero-tile" style="--tile-color:#46556e;--tile-bg:#eef1f6">
+        <span class="hero-tile-mark">All</span>
+        <span class="hero-tile-label" data-i18n="tile.browseAll">Browse all</span>
+      </a>
+      <a href="pages/breathe.html" class="hero-tile" style="--tile-color:#0054A6;--tile-bg:#e6f1fb">
+        <span class="hero-tile-mark">BR</span>
+        <span class="hero-tile-label">BREATHE</span>
+      </a>
+      <a href="pages/prompttb.html" class="hero-tile" style="--tile-color:#0f6e56;--tile-bg:#e1f5ee">
+        <span class="hero-tile-mark">PT</span>
+        <span class="hero-tile-label">PROMPT TB</span>
+      </a>
+      <a href="pages/all-resources.html?type=alg" class="hero-tile" style="--tile-color:#0054A6;--tile-bg:#e6f1fb">
+        <span class="hero-tile-mark">Alg</span>
+        <span class="hero-tile-label" data-i18n="tile.algorithms">Algorithms</span>
+      </a>
+      <a href="pages/all-resources.html?type=job" class="hero-tile" style="--tile-color:#0f6e56;--tile-bg:#e1f5ee">
+        <span class="hero-tile-mark">Job</span>
+        <span class="hero-tile-label" data-i18n="tile.jobAids">Job Aids</span>
+      </a>
+      <a href="pages/all-resources.html?type=vid" class="hero-tile" style="--tile-color:#46556e;--tile-bg:#eef1f6">
+        <span class="hero-tile-mark">Vid</span>
+        <span class="hero-tile-label" data-i18n="tile.videos">Videos</span>
+      </a>
+      <a href="pages/all-resources.html?type=pool" class="hero-tile" style="--tile-color:#8a5410;--tile-bg:#faeeda">
+        <span class="hero-tile-mark">Pool</span>
+        <span class="hero-tile-label" data-i18n="tile.poolTests">Pool Tests</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- PROJECTS -->
+  <div class="section-header">
+    <div>
+      <span class="section-eyebrow" data-i18n="home.eyebrowActive">Active programmes</span>
+      <h2 class="section-title" data-i18n="home.projects">Projects</h2>
+    </div>
+    <a href="pages/all-resources.html" class="section-link" data-i18n="common.viewAllResources">View all resources →</a>
+  </div>
+  <div class="projects-grid" id="projectsGrid"></div>
+
+  <div class="divider"></div>
+
+  <!-- RECENT RESOURCES -->
+  <div class="section-header">
+    <div>
+      <span class="section-eyebrow" data-i18n="home.eyebrowLatest">Latest</span>
+      <h2 class="section-title" data-i18n="home.recentlyAdded">Recently added resources</h2>
+    </div>
+    <a href="pages/all-resources.html" class="section-link" data-i18n="common.seeAll">See all →</a>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-label" data-i18n="common.filter">Filter:</span>
+    <button class="filter-btn active" data-type="all" data-i18n="common.allTypes">All types</button>
+    <button class="filter-btn" data-type="alg" data-i18n="filter.algorithms">Algorithms</button>
+    <button class="filter-btn" data-type="job" data-i18n="filter.jobAids">Job Aids</button>
+    <button class="filter-btn" data-type="vid" data-i18n="filter.videos">Videos</button>
+    <button class="filter-btn" data-type="pos" data-i18n="filter.posters">Posters</button>
+    <button class="filter-btn" data-type="expert" data-i18n="filter.expert">Expert Pool</button>
+    <button class="filter-btn" data-type="trunat" data-i18n="filter.trunat">Trunat</button>
+    <button class="filter-btn" data-type="hiv" data-i18n="filter.hiv">HIV Pool</button>
+  </div>
+
+  <div class="resource-panel">
+    <div class="resource-panel-header">
+      <h3 data-i18n="home.allResourcesPanel">All resources</h3>
+      <span id="resourceCount"></span>
+    </div>
+    <div id="resourceList"></div>
+  </div>
+
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="js/i18n.js"></script>
+<script src="js/data.js"></script>
+<script>
+  // Inject nav & footer
+  document.getElementById("nav-placeholder").innerHTML = renderNav("home")
+    .replace(/href="\.\.\/index\.html"/g, 'href="index.html"')
+    .replace(/href="\.\.\/pages\//g, 'href="pages/')
+    .replace(/href="\.\.\/internal\//g, 'href="internal/');
+  document.getElementById("footer-placeholder").innerHTML = renderFooter();
+  applyI18n();
+
+  // Fix nav search prefix for root
+  (function() {
+    const input = document.getElementById("navSearchInput");
+    if (!input) return;
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && input.value.trim()) {
+        window.location.href = `pages/search.html?q=${encodeURIComponent(input.value.trim())}`;
+      }
+    });
+  })();
+
+  // Project cards
+  const grid = document.getElementById("projectsGrid");
+  PROJECTS.forEach(p => {
+    const projectRes = RESOURCES.filter(r => r.project === p.id);
+    const count = projectRes.length;
+    const typeCounts = projectRes.reduce((acc, r) => { acc[r.typeKey] = (acc[r.typeKey] || 0) + 1; return acc; }, {});
+    const topTypes = Object.entries(typeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k, n]) => `<span class="project-pill ${TYPE_CLASS[k] || ''}">${TYPE_LABEL[k] || k} · ${n}</span>`)
+      .join("");
+    grid.innerHTML += `
+      <a href="pages/${p.page}" class="project-card" style="--card-accent:${p.color}; --card-accent-light:${p.lightColor}">
+        <div class="project-card-top">
+          <span class="project-card-mark">${p.shortName.split(" ").map(w => w[0]).join("").slice(0, 2)}</span>
+          <span class="badge badge-${p.status === "completed" ? "completed" : "active"}">${statusLabel(p.status)}</span>
+        </div>
+        <h3>${p.name}</h3>
+        <p>${p.description}</p>
+        <div class="project-card-pills">${topTypes}</div>
+        <div class="project-meta">
+          <span class="project-count">${tCount(count)}</span>
+          <span class="project-arrow" aria-hidden="true">→</span>
+        </div>
+      </a>`;
+  });
+
+  // Resource list (tile grid)
+  let activeType = "all";
+  function renderResources() {
+    const filtered = activeType === "all" ? RESOURCES : RESOURCES.filter(r => r.typeKey === activeType);
+    const list = document.getElementById("resourceList");
+    document.getElementById("resourceCount").textContent = tCount(filtered.length);
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="empty-state"><p>No resources found.</p></div>`;
+      return;
+    }
+    const shown = filtered.slice(0, 8);
+    list.innerHTML = renderResourceTiles(shown, true);
+    if (filtered.length > 8) {
+      list.innerHTML += `<div style="text-align:center;padding:1rem 1.25rem 1.25rem"><a href="pages/all-resources.html" class="section-link">${t("home.viewAllN", { n: filtered.length })}</a></div>`;
+    }
+  }
+
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeType = btn.dataset.type;
+      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderResources();
+    });
+  });
+  renderResources();
+
+  // Hero search
+  function runHeroSearch() {
+    const q = document.getElementById("heroSearch").value.trim();
+    if (!q) return;
+    window.location.href = `pages/search.html?q=${encodeURIComponent(q)}`;
+  }
+  document.getElementById("heroSearch").addEventListener("keydown", e => {
+    if (e.key === "Enter") runHeroSearch();
+  });
+  document.getElementById("heroSearchBtn").addEventListener("click", runHeroSearch);
+</script>
+</body>
+</html>

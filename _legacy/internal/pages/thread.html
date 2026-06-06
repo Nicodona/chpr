@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thread — CHPR Internal</title>
+  <link rel="stylesheet" href="../css/internal.css"/>
+</head>
+<body class="light-theme">
+<div id="nav-placeholder"></div>
+
+<main class="main" id="mainContent" style="display:none">
+
+  <a href="discussions.html" class="back-link">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Back to discussions
+  </a>
+
+  <!-- THREAD DETAIL -->
+  <div class="thread-detail-card" id="threadDetail"></div>
+
+  <!-- COMMENTS -->
+  <div class="comments-section">
+    <h2 id="commentsHeading">Comments</h2>
+    <div class="comment-list" id="commentList"></div>
+
+    <!-- ADD COMMENT -->
+    <div class="add-comment-box" id="addCommentBox"></div>
+  </div>
+
+</main>
+
+<div id="notFound" style="display:none">
+  <main class="main">
+    <a href="discussions.html" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back to discussions
+    </a>
+    <div class="empty-state" style="margin-top:3rem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p>Thread not found.</p>
+    </div>
+  </main>
+</div>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/internal.js"></script>
+<script>
+  const user = requireAuth("../index.html");
+  if (user) {
+    document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "discussions");
+    document.getElementById("footer-placeholder").innerHTML = renderInternalFooter();
+
+    const threadId = parseInt(new URLSearchParams(window.location.search).get("id"));
+    const thread = getThread(threadId);
+
+    if (!thread) {
+      document.getElementById("notFound").style.display = "block";
+    } else {
+      document.title = `${thread.title} — CHPR Internal`;
+      document.getElementById("mainContent").style.display = "block";
+
+      // Render thread
+      document.getElementById("threadDetail").innerHTML = `
+        <div class="thread-detail-header">
+          <h1>${escapeHtml(thread.title)}</h1>
+          <div class="thread-detail-meta">
+            <div class="author-block">
+              ${avatarHtml(thread.authorColor, thread.authorInitials, 26)}
+              <strong style="color:var(--text-primary)">${thread.authorName}</strong>
+              ${roleBadge(thread.authorRole)}
+            </div>
+            <span>·</span>
+            <span>${timeAgo(thread.date)}</span>
+            <span>·</span>
+            <div style="display:flex;gap:6px">${renderTags(thread.tags)}</div>
+          </div>
+        </div>
+        <div class="thread-detail-body">${nl2br(thread.body)}</div>
+      `;
+
+      function renderComments() {
+        const t = getThread(threadId);
+        const heading = document.getElementById("commentsHeading");
+        const list = document.getElementById("commentList");
+        heading.textContent = `${t.comments.length} Comment${t.comments.length !== 1 ? "s" : ""}`;
+
+        if (t.comments.length === 0) {
+          list.innerHTML = `<div style="font-size:14px;color:var(--text-muted);padding:0.5rem 0">No comments yet — be the first to reply.</div>`;
+        } else {
+          list.innerHTML = t.comments.map(c => `
+            <div class="comment-card">
+              <div class="comment-header">
+                ${avatarHtml(c.authorColor, c.authorInitials, 28)}
+                <span class="comment-author">${c.authorName}</span>
+                ${roleBadge(c.authorRole)}
+                <span class="comment-time">${timeAgo(c.date)}</span>
+              </div>
+              <div class="comment-body">${nl2br(c.body)}</div>
+            </div>`).join("");
+        }
+      }
+
+      const canComment = user.role === "admin" || user.role === "staff";
+      const commentBox = document.getElementById("addCommentBox");
+
+      if (canComment) {
+        commentBox.innerHTML = `
+          <h3>Add a comment</h3>
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            ${avatarHtml(user.color, user.initials, 32)}
+            <div style="flex:1">
+              <textarea class="form-textarea" id="commentBody" placeholder="Share your thoughts or response…" style="min-height:100px;margin-bottom:0.75rem"></textarea>
+              <div id="commentError" style="font-size:13px;color:#f87171;display:none;margin-bottom:0.5rem"></div>
+              <button class="btn-submit" onclick="submitComment()">Post comment</button>
+            </div>
+          </div>`;
+      } else {
+        commentBox.innerHTML = `<p style="font-size:13px;color:var(--text-muted)">You have viewer access — you can read but not post comments.</p>`;
+      }
+
+      window.submitComment = function() {
+        const body = document.getElementById("commentBody").value.trim();
+        const err  = document.getElementById("commentError");
+        if (!body) { err.textContent = "Comment cannot be empty."; err.style.display = "block"; return; }
+        err.style.display = "none";
+        addComment(threadId, {
+          body,
+          author: user.username,
+          authorName: user.name,
+          authorColor: user.color,
+          authorInitials: user.initials,
+          authorRole: user.role,
+        });
+        document.getElementById("commentBody").value = "";
+        renderComments();
+        // Scroll to bottom of comments
+        document.getElementById("commentList").lastElementChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      };
+
+      renderComments();
+    }
+  }
+</script>
+</body>
+</html>

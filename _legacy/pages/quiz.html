@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test your understanding — CHPR Resources Hub</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+
+<div id="nav-placeholder"></div>
+
+<main class="quiz-shell">
+  <a href="#" id="quizBackLink" class="viewer-back" data-i18n="quiz.back">← Back to resource</a>
+
+  <header class="quiz-header">
+    <span class="quiz-eyebrow" data-i18n="quiz.eyebrow">Knowledge check</span>
+    <h1 class="quiz-title" data-i18n="quiz.title">Test your understanding</h1>
+    <p class="quiz-sub" id="quizSub">A short quiz based on the resource you just read.</p>
+    <div class="quiz-meta">
+      <span class="quiz-meta-chip"><strong id="quizMcqCount">5</strong> <span data-i18n="quiz.multipleChoice">multiple choice</span></span>
+      <span class="quiz-meta-chip"><strong>1</strong> <span data-i18n="quiz.shortAnswer">short answer</span></span>
+      <span class="quiz-meta-chip quiz-meta-chip-time"><strong>~3</strong> <span data-i18n="quiz.min">min</span></span>
+    </div>
+  </header>
+
+  <form id="quizForm" class="quiz-form" novalidate>
+    <div id="quizQuestions"></div>
+
+    <div class="quiz-actions">
+      <button type="submit" class="btn-primary quiz-submit" data-i18n="quiz.submit">Submit &amp; see score</button>
+      <button type="button" class="btn-secondary" id="quizResetBtn" data-i18n="quiz.reset">Reset answers</button>
+    </div>
+  </form>
+
+  <section class="quiz-results" id="quizResults" hidden>
+    <div class="quiz-results-head">
+      <div class="quiz-score-circle" id="quizScoreCircle">
+        <span class="quiz-score-num" id="quizScoreNum">0</span>
+        <span class="quiz-score-tot" id="quizScoreTot">/ 6</span>
+      </div>
+      <div class="quiz-results-summary">
+        <h2 id="quizResultTitle">Nice work!</h2>
+        <p id="quizResultMessage">Here's how you did question-by-question.</p>
+      </div>
+    </div>
+    <ol class="quiz-breakdown" id="quizBreakdown"></ol>
+    <div class="quiz-results-actions">
+      <button type="button" class="btn-primary" id="quizRetakeBtn" data-i18n="quiz.retake">Retake quiz</button>
+      <a href="#" id="quizBackBtn" class="btn-secondary" data-i18n="quiz.backToResource">Back to resource</a>
+    </div>
+  </section>
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/i18n.js"></script>
+<script src="../js/data.js"></script>
+<script>
+  document.getElementById("nav-placeholder").innerHTML = renderNav("");
+  document.getElementById("footer-placeholder").innerHTML = renderFooter();
+  applyI18n();
+  initNavSearch();
+
+  // ---- Resource context (just for the header copy + back link) ----
+  const params = new URLSearchParams(location.search);
+  const resourceId = params.get("id");
+  const resource = resourceId ? getResourceById(resourceId) : null;
+
+  const backHref = resource ? `viewer.html?id=${encodeURIComponent(resource.id)}` : "all-resources.html";
+  document.getElementById("quizBackLink").href = backHref;
+  document.getElementById("quizBackBtn").href = backHref;
+  // Set the sub copy in JS (it's part data-driven). Done here rather than via a
+  // data-i18n attribute so the auto-translate pass doesn't clobber the resource name.
+  if (resource) {
+    document.getElementById("quizSub").innerHTML =
+      `${t("quiz.sub")} <strong>${escapeHtml(resource.name)}</strong> · ${escapeHtml(resource.projectName)}`;
+  } else {
+    document.getElementById("quizSub").textContent = t("quiz.sub");
+  }
+
+  // ---- Hardcoded question bank (mockup) ----
+  // Each MCQ has options + correct value. Essay has keywords for "credit".
+  const QUESTIONS = [
+    {
+      type: "mcq",
+      prompt: "What does the “QR” in “QR code” stand for?",
+      options: [
+        { value: "a", label: "Quality Response" },
+        { value: "b", label: "Quick Response" },
+        { value: "c", label: "Quantum Reader" },
+        { value: "d", label: "Query Result" }
+      ],
+      correct: "b",
+      explain: "QR codes were invented by Denso Wave in 1994 — the name stands for Quick Response, because they're optimised for fast scanning."
+    },
+    {
+      type: "mcq",
+      prompt: "To scan a QR code in the field, you typically need:",
+      options: [
+        { value: "a", label: "A flatbed scanner" },
+        { value: "b", label: "A specialised QR-only hardware reader" },
+        { value: "c", label: "A smartphone camera or a QR scanner app" },
+        { value: "d", label: "An internet connection at the time of scanning" }
+      ],
+      correct: "c",
+      explain: "Modern smartphone cameras decode QR codes natively. Internet is only required afterwards if the QR encodes a URL you want to open."
+    },
+    {
+      type: "mcq",
+      prompt: "Which of the following can be encoded inside a QR code?",
+      options: [
+        { value: "a", label: "URLs only" },
+        { value: "b", label: "Text only" },
+        { value: "c", label: "Phone numbers only" },
+        { value: "d", label: "URLs, text, contact info, Wi-Fi credentials, and more" }
+      ],
+      correct: "d",
+      explain: "QR codes are a flexible encoding. They support URLs, plain text, vCard contacts, Wi-Fi credentials, geo locations, and more."
+    },
+    {
+      type: "mcq",
+      prompt: "Why are QR codes useful in community health work?",
+      options: [
+        { value: "a", label: "They let participants reach training material instantly" },
+        { value: "b", label: "They cut down on long paper handouts" },
+        { value: "c", label: "They make follow-up resource sharing easier" },
+        { value: "d", label: "All of the above" }
+      ],
+      correct: "d",
+      explain: "All three are real benefits — fast access, less paper, and easier follow-up sharing. That's why CHPR is rolling them out at health camps."
+    },
+    {
+      type: "mcq",
+      prompt: "The black-and-white pattern in a QR code allows it to be read…",
+      options: [
+        { value: "a", label: "Only when held perfectly straight" },
+        { value: "b", label: "At various angles and orientations" },
+        { value: "c", label: "Only in direct sunlight" },
+        { value: "d", label: "Only by the device that created it" }
+      ],
+      correct: "b",
+      explain: "QR codes include position markers in three corners, so scanners can decode them at any rotation and even when partially skewed."
+    },
+    {
+      type: "essay",
+      prompt: "Briefly describe one CHPR clinical or community workflow where a QR code would speed things up. Mention what it would link to and who would scan it.",
+      keywords: ["patient", "participant", "scan", "link", "video", "form", "consent", "training", "resource", "follow", "register", "data", "facility", "camp", "community"],
+      placeholder: "e.g. At our health camps, the registration desk could print a QR code that links to the consent video so participants can…"
+    }
+  ];
+
+  const ESSAY_MAX_POINTS = 1;
+  const totalPossible = QUESTIONS.filter(q => q.type === "mcq").length + ESSAY_MAX_POINTS;
+
+  // ---- Render questions ----
+  const qContainer = document.getElementById("quizQuestions");
+  document.getElementById("quizMcqCount").textContent = QUESTIONS.filter(q => q.type === "mcq").length;
+  document.getElementById("quizScoreTot").textContent = `/ ${totalPossible}`;
+
+  function renderQuestions() {
+    qContainer.innerHTML = QUESTIONS.map((q, idx) => {
+      const num = idx + 1;
+      if (q.type === "mcq") {
+        return `
+          <div class="quiz-question" data-qidx="${idx}">
+            <div class="quiz-question-num">Question ${num}</div>
+            <h3 class="quiz-question-prompt">${escapeHtml(q.prompt)}</h3>
+            <div class="quiz-options" role="radiogroup">
+              ${q.options.map(opt => `
+                <label class="quiz-option">
+                  <input type="radio" name="q${idx}" value="${opt.value}"/>
+                  <span class="quiz-option-bullet">${opt.value.toUpperCase()}</span>
+                  <span class="quiz-option-label">${escapeHtml(opt.label)}</span>
+                </label>`).join("")}
+            </div>
+          </div>`;
+      }
+      // essay
+      return `
+        <div class="quiz-question quiz-question-essay" data-qidx="${idx}">
+          <div class="quiz-question-num">Question ${num} · Short answer</div>
+          <h3 class="quiz-question-prompt">${escapeHtml(q.prompt)}</h3>
+          <textarea class="quiz-textarea" name="q${idx}" rows="5" placeholder="${escapeHtml(q.placeholder || "Type your answer…")}"></textarea>
+          <p class="quiz-essay-hint">Tip: aim for 2–3 sentences. Scoring is based on keyword coverage for this mockup.</p>
+        </div>`;
+    }).join("");
+  }
+  renderQuestions();
+
+  // ---- Submit ----
+  document.getElementById("quizForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    scoreQuiz();
+  });
+
+  document.getElementById("quizResetBtn").addEventListener("click", () => {
+    document.getElementById("quizForm").reset();
+    document.querySelectorAll(".quiz-question").forEach(el => el.classList.remove("answered-correct", "answered-wrong"));
+  });
+
+  document.getElementById("quizRetakeBtn").addEventListener("click", () => {
+    document.getElementById("quizForm").reset();
+    document.querySelectorAll(".quiz-question").forEach(el => el.classList.remove("answered-correct", "answered-wrong"));
+    document.getElementById("quizResults").hidden = true;
+    document.getElementById("quizForm").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  function scoreQuiz() {
+    const form = document.getElementById("quizForm");
+    const breakdownEl = document.getElementById("quizBreakdown");
+    let earned = 0;
+    const items = [];
+
+    QUESTIONS.forEach((q, idx) => {
+      const qBlock = document.querySelector(`.quiz-question[data-qidx="${idx}"]`);
+      qBlock?.classList.remove("answered-correct", "answered-wrong");
+
+      if (q.type === "mcq") {
+        const chosen = form.elements[`q${idx}`]?.value || null;
+        const correct = chosen === q.correct;
+        if (correct) earned += 1;
+        if (chosen) {
+          qBlock?.classList.add(correct ? "answered-correct" : "answered-wrong");
+        }
+        const chosenLabel = q.options.find(o => o.value === chosen)?.label || "(no answer)";
+        const correctLabel = q.options.find(o => o.value === q.correct)?.label || "";
+        items.push({
+          type: "mcq",
+          num: idx + 1,
+          prompt: q.prompt,
+          correct,
+          chosenLabel,
+          correctLabel,
+          explain: q.explain,
+          earned: correct ? 1 : 0,
+          points: 1,
+        });
+      } else {
+        // essay: keyword-coverage scoring (mockup)
+        const answer = (form.elements[`q${idx}`]?.value || "").toLowerCase();
+        const hits = q.keywords.filter(k => answer.includes(k.toLowerCase()));
+        let pts = 0;
+        if (answer.trim().length < 25) pts = 0;
+        else if (hits.length >= 3) pts = 1;
+        else if (hits.length >= 1) pts = 0.5;
+        else pts = 0.25; // gave it a go
+        earned += pts;
+        qBlock?.classList.add(pts >= 0.75 ? "answered-correct" : "answered-wrong");
+        items.push({
+          type: "essay",
+          num: idx + 1,
+          prompt: q.prompt,
+          earned: pts,
+          points: ESSAY_MAX_POINTS,
+          answerLength: answer.trim().length,
+          hits,
+          totalKeywords: q.keywords.length,
+        });
+      }
+    });
+
+    // Show results
+    const pct = Math.round((earned / totalPossible) * 100);
+    document.getElementById("quizScoreNum").textContent = formatScore(earned);
+    document.getElementById("quizScoreTot").textContent = `/ ${totalPossible}`;
+    const circle = document.getElementById("quizScoreCircle");
+    circle.style.setProperty("--score-pct", pct + "%");
+    circle.classList.toggle("good", pct >= 70);
+    circle.classList.toggle("ok", pct >= 40 && pct < 70);
+    circle.classList.toggle("low", pct < 40);
+
+    const title = document.getElementById("quizResultTitle");
+    const msg = document.getElementById("quizResultMessage");
+    if (pct >= 85) { title.textContent = "Excellent — you've got this."; msg.textContent = "Strong understanding across the board. Ready to move on."; }
+    else if (pct >= 70) { title.textContent = "Nice work!"; msg.textContent = "Solid grasp of the material — review the items below to lock it in."; }
+    else if (pct >= 40) { title.textContent = "Good start."; msg.textContent = "You got the basics. Take another pass at the items you missed."; }
+    else { title.textContent = "Worth another read."; msg.textContent = "Go back to the resource and try again — the explanations below will help."; }
+
+    breakdownEl.innerHTML = items.map(it => {
+      if (it.type === "mcq") {
+        const verdict = it.correct
+          ? `<span class="quiz-verdict good">Correct</span>`
+          : `<span class="quiz-verdict bad">Not quite</span>`;
+        return `
+          <li class="quiz-breakdown-item ${it.correct ? "ok" : "bad"}">
+            <div class="quiz-breakdown-head">
+              <span class="quiz-breakdown-num">${it.num}</span>
+              ${verdict}
+              <span class="quiz-breakdown-points">${it.earned}/${it.points} pt</span>
+            </div>
+            <p class="quiz-breakdown-prompt">${escapeHtml(it.prompt)}</p>
+            <p class="quiz-breakdown-detail"><strong>Your answer:</strong> ${escapeHtml(it.chosenLabel)}</p>
+            ${it.correct ? "" : `<p class="quiz-breakdown-detail"><strong>Correct answer:</strong> ${escapeHtml(it.correctLabel)}</p>`}
+            <p class="quiz-breakdown-explain">${escapeHtml(it.explain || "")}</p>
+          </li>`;
+      }
+      const ratio = `${it.hits.length}/${it.totalKeywords}`;
+      const verdict = it.earned >= 0.75
+        ? `<span class="quiz-verdict good">Great answer</span>`
+        : it.earned > 0
+          ? `<span class="quiz-verdict ok">Partial credit</span>`
+          : `<span class="quiz-verdict bad">Needs more</span>`;
+      return `
+        <li class="quiz-breakdown-item ${it.earned >= 0.75 ? "ok" : "bad"}">
+          <div class="quiz-breakdown-head">
+            <span class="quiz-breakdown-num">${it.num}</span>
+            ${verdict}
+            <span class="quiz-breakdown-points">${formatScore(it.earned)}/${it.points} pt</span>
+          </div>
+          <p class="quiz-breakdown-prompt">${escapeHtml(it.prompt)}</p>
+          <p class="quiz-breakdown-detail"><strong>Keyword coverage:</strong> ${ratio} concept${it.hits.length !== 1 ? "s" : ""} mentioned${it.hits.length ? ` (${it.hits.map(escapeHtml).join(", ")})` : ""}</p>
+          <p class="quiz-breakdown-explain">Mockup scoring: full credit when your answer mentions three or more key concepts.</p>
+        </li>`;
+    }).join("");
+
+    const results = document.getElementById("quizResults");
+    results.hidden = false;
+    results.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function formatScore(n) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, "");
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+</script>
+</body>
+</html>

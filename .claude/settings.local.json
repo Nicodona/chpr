@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python.exe -c \"import drf_spectacular; print\\('YES', drf_spectacular.__version__\\)\")"
+    ]
+  }
+}

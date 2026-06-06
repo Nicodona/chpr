@@ -1,0 +1,168 @@
+"""
+Data models for the CHPR Resources Hub.
+
+Mirrors the static mockup's domain:
+  - Project        : a programme (BREATHE, PROMPT TB) that is "active" or "completed".
+  - Resource       : an uploadable document/video/poster/pool-test belonging to a project.
+  - ResourceComment: staff comments on a resource.
+  - ContactMessage : a "Contact us" enquiry from a site visitor.
+
+The Resource model carries the file upload plus pool-testing fields (Expert Pool,
+Trunat, HIV Pool) so the lab/testing resources can be captured and filtered.
+"""
+from django.db import models
+
+# models.py  (add at the bottom — all existing code stays)
+from django.contrib.auth.models import User
+
+class StaffProfile(models.Model):
+    """
+    Extends Django's built-in User with a role field.
+    Create via Django admin: Admin > Staff profiles > Add.
+    Every User that should access write endpoints needs one of these.
+    """
+
+    class Role(models.TextChoices):
+        ADMIN = "admin", "Admin"       # full CRUD + Django admin access
+        STAFF = "staff", "Staff"       # CRUD on resources only
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="staff_profile")
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.STAFF)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.get_role_display()})"
+
+    @property
+    def is_admin(self):
+        return self.role == self.Role.ADMIN
+class Project(models.Model):
+    """A CHPR programme. Status is managed from the Django admin (active/completed)."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        COMPLETED = "completed", "Completed"
+
+    slug = models.SlugField(max_length=60, unique=True, help_text="e.g. 'breathe', 'prompttb'")
+    name = models.CharField(max_length=200)
+    short_name = models.CharField(max_length=50, blank=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=9, default="#0054A6", help_text="Accent colour (hex)")
+    light_color = models.CharField(max_length=9, default="#e6f1fb", help_text="Light accent (hex)")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    order = models.PositiveIntegerField(default=0, help_text="Display order on the hub")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def resource_count(self):
+        return self.resources.count()
+
+
+class Resource(models.Model):
+    """
+    A resource attached to a project. Supports a file upload (PDF, video, image)
+    and classifies the resource by type — including the three pool-testing
+    categories used for lab testing resources.
+    """
+
+    class Type(models.TextChoices):
+        ALGORITHM = "alg", "Algorithm"
+        JOB_AID = "job", "Job Aid"
+        VIDEO = "vid", "Video"
+        POSTER = "pos", "Poster"
+        EXPERT_POOL = "expert", "Expert Pool"
+        TRUNAT = "trunat", "Trunat"
+        HIV_POOL = "hiv", "HIV Pool"
+
+    class Activity(models.TextChoices):
+        HEALTH_FACILITY = "hf", "Health Facilities"
+        HEALTH_CAMP = "hc", "Health Camps"
+        CROSS = "cr", "All"
+
+    # Pool-testing type keys, used for filtering "Pool Tests" together.
+    POOL_TYPES = (Type.EXPERT_POOL, Type.TRUNAT, Type.HIV_POOL)
+
+    project = models.ForeignKey(Project, related_name="resources", on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    type_key = models.CharField(max_length=20, choices=Type.choices, default=Type.JOB_AID)
+    activity = models.CharField(max_length=2, choices=Activity.choices, default=Activity.HEALTH_FACILITY)
+    description = models.TextField(blank=True)
+
+    # ---- Upload ----
+    file = models.FileField(upload_to="resources/%Y/%m/", blank=True, null=True)
+
+    # ---- Pool-testing fields (only meaningful for pool-test types) ----
+    test_platform = models.CharField(
+        max_length=100, blank=True,
+        help_text="Testing platform, e.g. GeneXpert, Truenat, Abbott m2000",
+    )
+    sample_type = models.CharField(
+        max_length=100, blank=True,
+        help_text="Specimen type, e.g. sputum, plasma, whole blood",
+    )
+    pool_size = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Number of specimens combined per pooled run",
+    )
+
+    # ---- Attribution ----
+    posted_by = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def is_pool_test(self):
+        return self.type_key in self.POOL_TYPES
+
+    @property
+    def type_label(self):
+        return self.get_type_key_display()
+
+
+class ResourceComment(models.Model):
+    """A staff comment on a resource (open thread in the mockup)."""
+
+    resource = models.ForeignKey(Resource, related_name="comments", on_delete=models.CASCADE)
+    author_name = models.CharField(max_length=150)
+    author_role = models.CharField(max_length=50, blank=True)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.author_name} on {self.resource_id}"
+
+
+class ContactMessage(models.Model):
+    """A 'Contact us' enquiry submitted from the public site."""
+
+    name = models.CharField(max_length=150)
+    email = models.EmailField()
+    team = models.CharField(max_length=100, blank=True)
+    message = models.TextField()
+    resource = models.ForeignKey(
+        Resource, related_name="contact_messages", on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    handled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} <{self.email}>"

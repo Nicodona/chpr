@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resource viewer — CHPR Resources Hub</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+
+<div id="nav-placeholder"></div>
+
+<main class="viewer-shell">
+  <a href="all-resources.html" class="viewer-back" data-i18n="viewer.backAll">← Back to all resources</a>
+  <div id="viewerRoot"></div>
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/i18n.js"></script>
+<script src="../js/data.js"></script>
+<script>
+  document.getElementById("nav-placeholder").innerHTML = renderNav("");
+  document.getElementById("footer-placeholder").innerHTML = renderFooter();
+  applyI18n();
+  initNavSearch();
+
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  const resource = id ? getResourceById(id) : null;
+  const root = document.getElementById("viewerRoot");
+
+  // Progress-tracking state. These MUST be declared before renderResource()
+  // runs, because renderResource synchronously calls trackVideoProgress /
+  // trackPdfPageProgress, which call setProgress, which reads these. If they
+  // were declared later in the script, the function would hit the Temporal
+  // Dead Zone and throw — silently halting the rest of renderResource
+  // (including renderComments), which is what was hiding the contact-admin
+  // panel on video resources and freezing the in-card progress bars.
+  let lastPct = -1;
+  let progressLocked = false;
+
+  if (!resource) {
+    root.innerHTML = `
+      <h1 class="viewer-title">${t("viewer.notFound")}</h1>
+      <p class="viewer-sub">${t("viewer.notFoundSub")}</p>
+      <a href="all-resources.html" class="btn-primary" style="display:inline-block;text-decoration:none;margin-top:1rem">${t("viewer.browseAll")}</a>`;
+  } else {
+    renderResource(resource);
+  }
+
+  function renderResource(r) {
+    const typeClass = TYPE_CLASS[r.typeKey] || "";
+    const postedBy = r.postedBy ? ` · Posted by <strong>${r.postedBy}</strong>` : "";
+    const postedAt = r.postedAt ? ` · ${new Date(r.postedAt).toLocaleDateString()}` : "";
+
+    root.innerHTML = `
+      <div class="viewer-meta">
+        <span class="res-type-badge ${typeClass}">${escapeHtml(typeLabel(r.typeKey))}</span>
+        <span>${r.projectName}</span>
+      </div>
+      <div class="viewer-title-row">
+        <h1 class="viewer-title">${escapeHtml(r.name)}</h1>
+        <button type="button" class="viewer-download-btn" id="viewerDownloadBtn" title="${t("viewer.download")}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          ${t("viewer.download")}
+        </button>
+      </div>
+      <div class="viewer-sub">${r.description ? escapeHtml(r.description) : defaultBlurb(r)}${postedBy}${postedAt}</div>
+
+      <div class="viewer-status" id="viewerStatus">${t("viewer.notStarted")}</div>
+
+      <div id="viewerBody"></div>
+
+      <div class="viewer-footer">
+        <span>${t("viewer.readingTracked")}</span>
+        <span id="viewerPercent">0%</span>
+      </div>
+
+      <section class="comments-section" id="commentsSection">
+        <div class="comments-header">
+          <h2 class="comments-title">${t("viewer.comments")}</h2>
+          <span class="comments-count" id="commentsCount">0</span>
+        </div>
+        <p class="comments-sub">${t("viewer.commentsSub")}</p>
+        <div id="commentComposer"></div>
+        <div id="commentList" class="comment-list"></div>
+      </section>`;
+
+    const body = document.getElementById("viewerBody");
+    const isVideo = r.typeKey === "vid" || (r.mimeType && r.mimeType.startsWith("video/"));
+    const isImage = r.mimeType && r.mimeType.startsWith("image/");
+    const isPdf   = r.mimeType === "application/pdf";
+
+    if (r.dataUrl && isVideo) {
+      body.innerHTML = `
+        <div class="viewer-video-card">
+          <div class="viewer-media"><video id="viewerVideo" controls src="${r.dataUrl}"></video></div>
+          ${videoIndicatorMarkup()}
+        </div>`;
+      trackVideoProgress(document.getElementById("viewerVideo"));
+    } else if (r.dataUrl && isImage) {
+      body.innerHTML = `<div class="viewer-media"><img src="${r.dataUrl}" alt="${escapeAttr(r.name)}"/></div>`;
+      trackScrollProgress(body);
+    } else if (r.dataUrl && isPdf) {
+      body.innerHTML = `<div class="viewer-media"><iframe src="${r.dataUrl}" title="${escapeAttr(r.name)}"></iframe></div>`;
+      trackScrollProgress(body, /*isIframe*/ true);
+    } else if (r.dataUrl) {
+      body.innerHTML = `
+        <div class="viewer-content">
+          <p>This resource is attached as a file. Open or download it below to use it in your workflow.</p>
+          <a class="btn-primary" style="text-decoration:none;display:inline-block" href="${r.dataUrl}" download="${escapeAttr(r.fileName || r.name)}">Download attachment</a>
+        </div>`;
+      trackScrollProgress(body);
+    } else if (r.typeKey === "vid" && typeof sampleVideoUrl === "function") {
+      // Seeded video resource: play the shared sample video; progress = playback %.
+      body.innerHTML = `
+        <div class="viewer-video-card">
+          <div class="viewer-media">
+            <video id="viewerVideo" controls preload="metadata" src="${sampleVideoUrl()}"></video>
+          </div>
+          ${videoIndicatorMarkup()}
+        </div>
+        <div class="viewer-quiz-cta">
+          <div class="viewer-quiz-cta-text">
+            <h3>${t("viewer.quizCtaTitle")}</h3>
+            <p>${t("viewer.quizCtaSub")}</p>
+          </div>
+          <a href="quiz.html?id=${encodeURIComponent(r.id)}" class="viewer-quiz-btn">
+            ${t("viewer.quizCtaBtn")}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>`;
+      trackVideoProgress(document.getElementById("viewerVideo"));
+    } else if (typeof samplePdfUrl === "function") {
+      // Seeded document resource: load the shared sample PDF inline. The
+      // inner scrollable region IS the reading area — progress is tracked
+      // by which page is visible, and shown both in the sticky top bar and
+      // in the in-card indicator below.
+      body.innerHTML = `
+        <div class="viewer-pdf-card" id="viewerPdfCard">
+          <div class="viewer-pdf-indicator" id="viewerPdfIndicator" aria-live="polite">
+            <span class="viewer-pdf-indicator-page" id="viewerPdfPageLabel">Progress</span>
+            <div class="viewer-pdf-indicator-bar"><div class="viewer-pdf-indicator-fill" id="viewerPdfIndicatorFill"></div></div>
+            <span class="viewer-pdf-indicator-pct" id="viewerPdfPctLabel">0%</span>
+          </div>
+          <div class="viewer-pdf" id="viewerPdf">
+            <div class="viewer-pdf-loading" id="viewerPdfLoading">
+              <div class="viewer-pdf-spinner"></div>
+              <p>${t("viewer.loadingDoc")}</p>
+            </div>
+            <div class="viewer-pdf-pages" id="viewerPdfPages"></div>
+            <div class="viewer-pdf-empty" id="viewerPdfEmpty" style="display:none">
+              <p>Couldn't render the PDF inline. <a href="${samplePdfUrl()}" target="_blank" rel="noopener">Open it in a new tab</a> instead.</p>
+            </div>
+          </div>
+        </div>
+        <div class="viewer-quiz-cta">
+          <div class="viewer-quiz-cta-text">
+            <h3>${t("viewer.quizCtaTitle")}</h3>
+            <p>${t("viewer.quizCtaSub")}</p>
+          </div>
+          <a href="quiz.html?id=${encodeURIComponent(r.id)}" class="viewer-quiz-btn">
+            ${t("viewer.quizCtaBtn")}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>`;
+      renderInlinePdf(samplePdfUrl(), document.getElementById("viewerPdf"));
+    } else {
+      body.innerHTML = `<div class="viewer-content">${demoContentFor(r)}</div>`;
+      trackScrollProgress(body);
+    }
+
+    renderComments(r);
+    wireDownloadButton(r);
+  }
+
+  // -------- Download button (works for every resource) --------
+  function wireDownloadButton(r) {
+    const btn = document.getElementById("viewerDownloadBtn");
+    if (!btn) return;
+    btn.addEventListener("click", () => downloadResource(r));
+  }
+
+  function downloadResource(r) {
+    // Uploaded file → download the actual asset
+    if (r.dataUrl) {
+      const a = document.createElement("a");
+      a.href = r.dataUrl;
+      a.download = r.fileName || `${r.name}.${guessExt(r.mimeType)}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (typeof showToast === "function") showToast("Download started.");
+      return;
+    }
+    // Seeded video resource → hand them the shared sample video
+    if (r.typeKey === "vid" && typeof sampleVideoUrl === "function") {
+      const a = document.createElement("a");
+      a.href = sampleVideoUrl();
+      a.download = `${slugify(r.name)}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (typeof showToast === "function") showToast("Download started.");
+      return;
+    }
+    // Seeded document resource → hand them the shared sample PDF
+    if (typeof samplePdfUrl === "function") {
+      const a = document.createElement("a");
+      a.href = samplePdfUrl();
+      a.download = `${slugify(r.name)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (typeof showToast === "function") showToast("Download started.");
+      return;
+    }
+    // Legacy fallback (shouldn't be reached): generate a printable HTML summary
+    const html = buildDownloadableHtml(r);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slugify(r.name)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (typeof showToast === "function") showToast("Download started.");
+  }
+
+  function guessExt(mime) {
+    if (!mime) return "bin";
+    if (mime.startsWith("image/")) return mime.split("/")[1] || "png";
+    if (mime.startsWith("video/")) return mime.split("/")[1] || "mp4";
+    if (mime === "application/pdf") return "pdf";
+    return "bin";
+  }
+
+  function slugify(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "resource";
+  }
+
+  function buildDownloadableHtml(r) {
+    const inner = (r.typeKey === "vid")
+      ? `<p><em>Video resources are streamed in the CHPR Resources Hub. This download is a printable summary of the training video.</em></p>${demoContentFor(r)}`
+      : demoContentFor(r);
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>${escapeHtml(r.name)} — CHPR Resources Hub</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 820px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1f2e; line-height: 1.65; }
+  h1 { font-size: 1.6rem; margin-bottom: 0.3rem; }
+  .meta { color: #64748b; font-size: 13px; margin-bottom: 2rem; }
+  h2 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; color: #003d7a; }
+  .step { background: #f5f7fa; border-left: 3px solid #0054A6; border-radius: 6px; padding: 10px 14px; margin-bottom: 0.6rem; }
+  ul, ol { margin-left: 1.5rem; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; }
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(r.name)}</h1>
+  <div class="meta">${escapeHtml(r.type)} · ${escapeHtml(r.projectName)}</div>
+  ${inner}
+  <footer>Downloaded from the CHPR Resources Hub on ${new Date().toLocaleDateString()}.</footer>
+</body>
+</html>`;
+  }
+
+  // -------- Comments (signed-in users) / Contact admin (guests) --------
+  // The comments thread is a staff-only conversation. Visitors who aren't
+  // signed in get a single "Contact admin" panel in the same slot instead —
+  // they can ask a question that emails an admin directly.
+  function renderComments(r) {
+    const user = navGetUser();
+    const section = document.getElementById("commentsSection");
+    if (!section) return;
+
+    if (!user) {
+      section.innerHTML = `
+        <div class="contact-admin-panel">
+          <div class="contact-admin-panel-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+          </div>
+          <div class="contact-admin-panel-body">
+            <h2 class="contact-admin-panel-title">${t("viewer.contactTitle")}</h2>
+            <p class="contact-admin-panel-sub">${t("viewer.contactSub")} <a href="../internal/index.html?return=public">${t("viewer.contactSignin")}</a> ${t("viewer.contactIfStaff")}</p>
+            <button type="button" class="btn-primary contact-admin-panel-btn"
+              onclick="openContactModal({resourceId:'${escapeAttr(String(r.id))}'})">
+              ${t("viewer.contactBtn")}
+            </button>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // Signed-in: render the full comments thread + composer
+    section.innerHTML = `
+      <div class="comments-header">
+        <h2 class="comments-title">${t("viewer.comments")}</h2>
+        <span class="comments-count" id="commentsCount">0</span>
+      </div>
+      <p class="comments-sub">${t("viewer.commentsSub")}</p>
+      <div id="commentComposer"></div>
+      <div id="commentList" class="comment-list"></div>`;
+
+    const initials = user.initials || user.name.slice(0, 2).toUpperCase();
+    const avatarColor = user.color || "var(--primary)";
+    const meta = `${t("viewer.postingAs")} <strong>${escapeHtml(user.name)}</strong> · ${escapeHtml(user.role)}`;
+
+    document.getElementById("commentComposer").innerHTML = `
+      <form class="comment-composer" id="commentForm">
+        <div class="comment-avatar" style="background:${avatarColor}">${escapeHtml(initials)}</div>
+        <div class="comment-composer-body">
+          <label class="comment-input-label" for="commentBody">${t("viewer.addComment")}</label>
+          <textarea id="commentBody" class="comment-textarea" placeholder="${t("viewer.commentPlaceholder")}" rows="3"></textarea>
+          <div class="comment-composer-actions">
+            <span class="comment-composer-meta">${meta}</span>
+            <button type="submit" class="btn-primary comment-submit-btn">${t("viewer.postComment")}</button>
+          </div>
+          <div class="field-error" id="commentError"></div>
+        </div>
+      </form>`;
+
+    document.getElementById("commentForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      submitComment(r);
+    });
+    refreshCommentList(r);
+  }
+
+  function submitComment(r) {
+    const user = navGetUser();
+    if (!user) return;
+    const ta = document.getElementById("commentBody");
+    const err = document.getElementById("commentError");
+    const body = (ta.value || "").trim();
+    if (!body) {
+      err.textContent = "Please write something before posting.";
+      err.style.display = "block";
+      return;
+    }
+    if (body.length > 2000) {
+      err.textContent = "Comments are capped at 2000 characters.";
+      err.style.display = "block";
+      return;
+    }
+    err.style.display = "none";
+    addResourceComment(r.id, {
+      body,
+      authorUsername: user.username,
+      authorName: user.name,
+      authorRole: user.role,
+      authorColor: user.color,
+      authorInitials: user.initials || user.name.slice(0, 2).toUpperCase(),
+    });
+    ta.value = "";
+    refreshCommentList(r);
+    if (typeof showToast === "function") showToast("Comment saved.");
+  }
+
+  function refreshCommentList(r) {
+    const list = document.getElementById("commentList");
+    const count = document.getElementById("commentsCount");
+    const items = getResourceComments(r.id);
+    count.textContent = items.length;
+    if (items.length === 0) {
+      list.innerHTML = `<div class="comment-empty">${t("viewer.noComments")}</div>`;
+      return;
+    }
+    list.innerHTML = items
+      .slice()
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .map(c => {
+        const initials = c.authorInitials || (c.authorName || "?").slice(0, 2).toUpperCase();
+        const color = c.authorColor || "#0054A6";
+        return `
+          <div class="comment-item">
+            <div class="comment-avatar" style="background:${color}">${escapeHtml(initials)}</div>
+            <div class="comment-body-wrap">
+              <div class="comment-meta">
+                <strong>${escapeHtml(c.authorName || "Staff")}</strong>
+                <span class="comment-role">${escapeHtml(c.authorRole || "")}</span>
+                <span class="comment-time">${formatCommentTime(c.date)}</span>
+              </div>
+              <div class="comment-body">${escapeHtml(c.body).replace(/\n/g, "<br>")}</div>
+            </div>
+          </div>`;
+      }).join("");
+  }
+
+  function formatCommentTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+
+  // -------- Progress tracking --------
+  // Markup for the in-card video progress strip — pinned just under the player.
+  function videoIndicatorMarkup() {
+    return `
+      <div class="viewer-video-indicator" aria-live="polite">
+        <span class="viewer-video-indicator-time" id="viewerVideoTimeLabel">0:00 / 0:00</span>
+        <div class="viewer-video-indicator-bar"><div class="viewer-video-indicator-fill" id="viewerVideoIndicatorFill"></div></div>
+        <span class="viewer-video-indicator-pct" id="viewerVideoPctLabel">0%</span>
+      </div>`;
+  }
+
+  // Once the user reaches 100%, freeze the progress so scrolling back up or
+  // seeking earlier in the video doesn't reset the "Completed" status.
+  // `lastPct` and `progressLocked` are declared above the renderResource()
+  // call so they're initialized when setProgress is reached.
+  function setProgress(pct) {
+    if (progressLocked) return;
+    const clamped = Math.max(0, Math.min(100, pct));
+    const rounded = Math.round(clamped);
+    if (rounded === lastPct) return;
+    lastPct = rounded;
+
+    const pctEl = document.getElementById("viewerPercent");
+    if (pctEl) pctEl.textContent = rounded + "%";
+
+    // In-card PDF indicator
+    const pdfFill = document.getElementById("viewerPdfIndicatorFill");
+    const pdfPct = document.getElementById("viewerPdfPctLabel");
+    if (pdfFill) {
+      pdfFill.style.width = rounded + "%";
+      pdfFill.classList.toggle("is-complete", rounded >= 100);
+    }
+    if (pdfPct) pdfPct.textContent = rounded + "%";
+
+    // In-card video indicator
+    const vidFill = document.getElementById("viewerVideoIndicatorFill");
+    const vidPct = document.getElementById("viewerVideoPctLabel");
+    if (vidFill) {
+      vidFill.style.width = rounded + "%";
+      vidFill.classList.toggle("is-complete", rounded >= 100);
+    }
+    if (vidPct) vidPct.textContent = rounded + "%";
+
+    const status = document.getElementById("viewerStatus");
+    if (status) {
+      status.classList.remove("in-progress", "complete");
+      if (rounded >= 100) {
+        status.classList.add("complete");
+        status.textContent = t("viewer.completed");
+      } else if (rounded > 1) {
+        status.classList.add("in-progress");
+        status.textContent = t("viewer.inProgress") + " · " + rounded + "%";
+      } else {
+        status.textContent = t("viewer.notStarted");
+      }
+    }
+
+    if (rounded >= 100) progressLocked = true;
+  }
+
+  // Track scroll progress through the page from top to the bottom of the resource body.
+  // 0% at page top; 100% when the bottom of the body content reaches the bottom of the viewport.
+  function trackScrollProgress(target) {
+    const compute = () => {
+      if (!target) { setProgress(0); return; }
+      const rect = target.getBoundingClientRect();
+      const bodyTop = rect.top + window.scrollY;
+      const bodyHeight = target.offsetHeight || target.scrollHeight || rect.height;
+      const winH = window.innerHeight;
+      const endScroll = bodyTop + bodyHeight - winH;
+      if (endScroll <= 0) { setProgress(100); return; }
+      const pct = (window.scrollY / endScroll) * 100;
+      setProgress(Math.max(0, Math.min(100, pct)));
+    };
+    // Defer one frame so layout has settled
+    requestAnimationFrame(compute);
+    window.addEventListener("scroll", compute, { passive: true });
+    window.addEventListener("resize", compute);
+    // Also recompute when images/iframes load (changes body height)
+    setTimeout(compute, 300);
+    setTimeout(compute, 1200);
+  }
+
+  // Track reading progress from the PDF card's *own* scroll position.
+  // Reads scrollTop/scrollHeight directly off the card element — no rect
+  // math, no IntersectionObserver. The card is the only thing we listen to.
+  function trackPdfPageProgress(scrollEl, pages) {
+    if (!scrollEl || !pages || !pages.length) return;
+    const total = pages.length;
+    const pageLabel = document.getElementById("viewerPdfPageLabel");
+
+    function update() {
+      const max = scrollEl.scrollHeight - scrollEl.clientHeight;
+      const top = scrollEl.scrollTop;
+
+      let pct, currentPage;
+      if (max <= 0) {
+        // Single-page document — show "Page 1 of 1" at 100%
+        pct = 100;
+        currentPage = total;
+      } else {
+        // Which page sits under the upper third of the visible window?
+        // Using a slice 35% down the viewport reads the page the user is
+        // actively looking at, not the one at the very top edge.
+        const focusY = top + scrollEl.clientHeight * 0.35;
+        const pageHeight = scrollEl.scrollHeight / total;
+        currentPage = Math.min(total, Math.max(1, Math.ceil(focusY / pageHeight)));
+
+        if (max - top <= 4) {
+          // Bottom of last page → 100%
+          pct = 100;
+          currentPage = total;
+        } else {
+          // Smooth scroll-driven percentage so the bar grows as the user
+          // moves through the document, not in discrete page-sized jumps.
+          pct = (top / max) * 100;
+        }
+      }
+
+      if (pageLabel) pageLabel.textContent = `Page ${currentPage} of ${total}`;
+      setProgress(pct);
+    }
+
+    // Only the card's scroll drives progress
+    scrollEl.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+
+    // Initial + a couple of delayed kicks so the bar lands correctly after
+    // PDF.js has finished laying out and the card's scrollHeight is final
+    requestAnimationFrame(update);
+    setTimeout(update, 300);
+    setTimeout(update, 1200);
+  }
+
+  function trackVideoProgress(video) {
+    if (!video) return;
+    const timeLabel = document.getElementById("viewerVideoTimeLabel");
+
+    function fmtTime(t) {
+      if (!isFinite(t) || t < 0) t = 0;
+      const m = Math.floor(t / 60);
+      const s = Math.floor(t % 60);
+      return `${m}:${s.toString().padStart(2, "0")}`;
+    }
+    function updateTimeLabel() {
+      if (!timeLabel) return;
+      const dur = isFinite(video.duration) ? video.duration : 0;
+      timeLabel.textContent = `${fmtTime(video.currentTime)} / ${fmtTime(dur)}`;
+    }
+
+    setProgress(0);
+    updateTimeLabel();
+
+    video.addEventListener("loadedmetadata", updateTimeLabel);
+    video.addEventListener("timeupdate", () => {
+      updateTimeLabel();
+      if (!video.duration) return;
+      setProgress((video.currentTime / video.duration) * 100);
+    });
+    video.addEventListener("ended", () => {
+      updateTimeLabel();
+      setProgress(100);
+    });
+  }
+
+  // -------- Inline PDF rendering --------
+  // Renders every page as a canvas in the page DOM, then hands off to
+  // trackScrollProgress so the window scroll position becomes the progress signal.
+
+  // Load a URL as ArrayBuffer. XHR is used because under file:// browsers block
+  // fetch() of local files but allow XHR — and because PDF.js's own worker fetch
+  // doesn't work for relative file:// URLs.
+  function fetchAsArrayBuffer(url) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.responseType = "arraybuffer";
+      xhr.onload = () => {
+        // status 0 is valid for file:// requests that succeeded
+        if (xhr.status === 200 || xhr.status === 0) {
+          resolve(xhr.response);
+        } else {
+          reject(new Error(`HTTP ${xhr.status} loading PDF`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error loading PDF"));
+      xhr.send();
+    });
+  }
+
+  async function renderInlinePdf(pdfUrl, scrollContainer) {
+    const loading = document.getElementById("viewerPdfLoading");
+    const pagesEl = document.getElementById("viewerPdfPages");
+    const emptyEl = document.getElementById("viewerPdfEmpty");
+    if (!pagesEl) return;
+
+    try {
+      const lib = await loadPdfJs();
+
+      // Always load the bytes ourselves; bypasses the worker's fetch limits.
+      const bytes = await fetchAsArrayBuffer(pdfUrl);
+
+      // Pass the bytes directly; clone to a Uint8Array because PDF.js takes
+      // ownership of the buffer it's given.
+      const data = new Uint8Array(bytes);
+
+      let pdf;
+      try {
+        pdf = await lib.getDocument({ data }).promise;
+      } catch (workerErr) {
+        // Some browsers (or strict CSPs) block the worker. Retry without it.
+        console.warn("PDF.js with worker failed, retrying without worker:", workerErr);
+        pdf = await lib.getDocument({ data: new Uint8Array(bytes), disableWorker: true }).promise;
+      }
+
+      const containerWidth = pagesEl.clientWidth || 820;
+      const pageEls = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const targetScale = Math.min(2.0, Math.max(1.0, containerWidth / baseViewport.width));
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const viewport = page.getViewport({ scale: targetScale });
+
+        const wrap = document.createElement("div");
+        wrap.className = "viewer-pdf-page";
+        wrap.dataset.pageNumber = String(i);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.style.width = "100%";
+        canvas.style.height = "auto";
+
+        const label = document.createElement("div");
+        label.className = "viewer-pdf-page-label";
+        label.textContent = `Page ${i} of ${pdf.numPages}`;
+
+        wrap.appendChild(canvas);
+        wrap.appendChild(label);
+        pagesEl.appendChild(wrap);
+        pageEls.push(wrap);
+
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+      }
+      if (loading) loading.style.display = "none";
+      // Track page-based progress against the rendered pages inside the card
+      trackPdfPageProgress(scrollContainer, pageEls);
+    } catch (err) {
+      console.error("Inline PDF render failed, falling back to inline iframe:", err);
+      // Last resort: show the PDF inline via the browser's built-in viewer.
+      // The iframe fills the card; its internal scroll is owned by the browser
+      // PDF viewer, so we can't measure it — leave progress at 0 until the
+      // user opens the file in a new tab or marks it complete some other way.
+      if (loading) loading.style.display = "none";
+      if (emptyEl) emptyEl.style.display = "none";
+      pagesEl.innerHTML = `
+        <div class="viewer-pdf-fallback">
+          <iframe class="viewer-pdf-iframe" src="${pdfUrl}" title="Document"></iframe>
+        </div>`;
+    }
+  }
+
+  // -------- Helpers --------
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  function defaultBlurb(r) {
+    return `${typeLabel(r.typeKey)} · used by ${r.activity === "hc" ? "community health camps" : "health facility teams"} on the ${r.projectName} project.`;
+  }
+
+  // Generated demo content for seeded resources (so the viewer always has something to render)
+  function demoContentFor(r) {
+    if (r.typeKey === "alg") {
+      return `
+        <h2>Purpose</h2>
+        <p>This algorithm guides clinicians through a standardized decision flow when triaging patients on the ${escapeHtml(r.projectName)} project. Follow each step carefully — branching choices depend on the answer at the previous node.</p>
+
+        <h2>Decision flow</h2>
+        <div class="step"><strong>Step 1.</strong> Confirm patient consent and capture identifiers in the data collection form.</div>
+        <div class="step"><strong>Step 2.</strong> Record presenting symptoms (cough, fever, night sweats, weight loss) with onset dates.</div>
+        <div class="step"><strong>Step 3.</strong> Apply the screening rule: if ≥ 2 cardinal symptoms are present, proceed to confirmatory testing; otherwise, schedule follow-up at 14 days.</div>
+        <div class="step"><strong>Step 4.</strong> Order the appropriate diagnostic (sputum smear, GeneXpert, or chest imaging) per the project SOP.</div>
+        <div class="step"><strong>Step 5.</strong> Document outcome and route the result through the data team for entry into REDCap.</div>
+
+        <h2>Notes for field teams</h2>
+        <p>Edge cases that fall outside the algorithm should be flagged to the project clinical lead. Do not improvise on the diagnostic pathway — deviations should be logged so the protocol can be refined.</p>
+        <p>Calibration of any equipment used in the workflow must be current; check the calibration log before each shift and after any equipment transport.</p>
+
+        <h2>Quality checks</h2>
+        <ol>
+          <li>Two independent operators should review borderline cases before classification is finalized.</li>
+          <li>All paper forms must be cross-checked against the digital entry within 24 hours of collection.</li>
+          <li>Any algorithm deviation must include a free-text justification on the record.</li>
+        </ol>
+      `;
+    }
+
+    if (r.typeKey === "job") {
+      return `
+        <h2>Overview</h2>
+        <p>This job aid is a quick-reference checklist for staff carrying out the ${escapeHtml(r.name)} workflow. Keep it within reach during sessions and tick each step as it is completed.</p>
+
+        <h2>Pre-session checklist</h2>
+        <ul>
+          <li>Confirm the day's patient list and consent forms are pre-printed.</li>
+          <li>Verify equipment is powered, calibrated, and within consumables stock.</li>
+          <li>Open the data entry form on the assigned device and validate connectivity.</li>
+        </ul>
+
+        <h2>During session</h2>
+        <ul>
+          <li>Greet the participant and confirm identity using two identifiers.</li>
+          <li>Walk through the consent script using local-language version 4.2.</li>
+          <li>Capture readings into the assigned form and double-check critical numeric values.</li>
+        </ul>
+
+        <h2>End-of-session checklist</h2>
+        <ul>
+          <li>Sync the device to the central server and verify the upload count.</li>
+          <li>Decontaminate equipment per the SOP and log surface cleaning.</li>
+          <li>Hand off paper forms to the data clerk; capture the handover signature.</li>
+        </ul>
+
+        <h2>Common pitfalls</h2>
+        <p>The most frequent issue at sites is incomplete identifier capture — confirm both the participant ID and the household ID on each record. Missing fields slow down the analysis pipeline significantly.</p>
+      `;
+    }
+
+    if (r.typeKey === "vid") {
+      return `
+        <h2>About this video</h2>
+        <p>This is a placeholder for the ${escapeHtml(r.name)} training video. In the live system, the actual recording would be embedded here for inline playback with progress tracking.</p>
+
+        <h2>Topics covered</h2>
+        <ol>
+          <li>Equipment setup, calibration, and pre-flight checks.</li>
+          <li>Patient positioning and instruction in the local language.</li>
+          <li>Common operator errors and how to recover.</li>
+          <li>Closing the session and verifying the data sync.</li>
+        </ol>
+
+        <h2>How to follow along</h2>
+        <p>Use this resource alongside the corresponding job aid. When the video calls out a checkpoint, pause and confirm the same checkpoint on the printed aid before continuing — that practice has measurably reduced data quality issues at health camps.</p>
+
+        <h2>Discussion prompts</h2>
+        <p>After watching, debrief with the team: what was unfamiliar? Which step would you adapt for your specific site? Capture the answers on the project's discussion board so they can be reviewed during the next supervisory visit.</p>
+      `;
+    }
+
+    if (r.typeKey === "pos") {
+      return `
+        <h2>Community message</h2>
+        <p>This poster is intended for waiting areas, community health camps, and outreach posts. The visual layout pairs a clear key message with three supporting points designed to reinforce community awareness around the project's clinical aims.</p>
+
+        <h2>Key message</h2>
+        <p>Early identification matters. Anyone with a cough lasting more than two weeks should attend the nearest screening point. Care is free at participating sites and conducted with full confidentiality.</p>
+
+        <h2>How to use the poster</h2>
+        <ul>
+          <li>Display in patient-facing areas at eye level.</li>
+          <li>Pair with a verbal walk-through during the first hour of each session.</li>
+          <li>Replace torn or sun-bleached copies promptly to maintain credibility.</li>
+        </ul>
+
+        <h2>Distribution log</h2>
+        <p>Each printed poster should be logged against a site code in the dispatch register. This helps the project team understand reach and identify gaps in coverage during the quarterly review.</p>
+      `;
+    }
+
+    if (isPoolType(r.typeKey)) {
+      const platform = r.typeKey === "trunat"
+        ? "Truenat"
+        : r.typeKey === "hiv"
+          ? "HIV pooled viral load"
+          : "Xpert MTB/RIF";
+      return `
+        <h2>What is pooled testing?</h2>
+        <p>Pooled testing combines samples from several individuals into a single ${escapeHtml(platform)} run. When the pool is negative, every sample in it is cleared at once; only positive pools are broken down and retested individually. This stretches limited cartridges and reagents on the ${escapeHtml(r.projectName)} project while keeping turnaround acceptable.</p>
+
+        <h2>Pooling workflow</h2>
+        <div class="step"><strong>Step 1 — Eligibility.</strong> Confirm each specimen meets the protocol's pooling criteria (sample type, volume, and quality) before it enters a pool.</div>
+        <div class="step"><strong>Step 2 — Build the pool.</strong> Combine the agreed number of specimens (typically 4–5) using the labelled pooling worksheet so every specimen is traceable to its pool.</div>
+        <div class="step"><strong>Step 3 — Run.</strong> Process the pool on the ${escapeHtml(platform)} platform per the SOP and record the run details in the log.</div>
+        <div class="step"><strong>Step 4 — Resolve positives.</strong> If the pool is positive (or indeterminate), retest each contributing specimen individually to identify the positive(s).</div>
+        <div class="step"><strong>Step 5 — Report.</strong> Release individual results only; never report a pooled result to a patient. Reconcile the worksheet against the digital data entry form.</div>
+
+        <h2>Quality controls</h2>
+        <p>Validate the pool size against the protocol — over-pooling dilutes low-burden samples and can reduce sensitivity. Run controls at the start of every shift and after any reagent change; a failed control invalidates the whole pool.</p>
+
+        <h2>When NOT to pool</h2>
+        <ul>
+          <li>High pre-test probability or symptomatic individuals where a fast individual result is needed.</li>
+          <li>Specimens with insufficient volume or quality to split across a pool and a confirmatory run.</li>
+          <li>Settings where positivity is high enough that most pools would need deconvolution anyway.</li>
+        </ul>
+      `;
+    }
+
+    // Generic fallback for any other resource type
+    return `
+      <h2>Overview</h2>
+      <p>This resource supports the ${escapeHtml(r.projectName)} project. Use it alongside the project SOP and keep it within reach during the relevant workflow.</p>
+
+      <h2>How to use it</h2>
+      <ul>
+        <li>Review it before the session and confirm you're on the current version.</li>
+        <li>Follow each step as written; flag edge cases to the project lead rather than improvising.</li>
+        <li>Record outcomes in the digital data entry form and reconcile against any paper records.</li>
+      </ul>
+    `;
+  }
+</script>
+</body>
+</html>

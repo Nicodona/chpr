@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>All Resources — CHPR Resources Hub</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div id="nav-placeholder"></div>
+
+<main class="main">
+  <a href="../index.html" class="back-link" data-i18n="common.backToHub">← Back to Hub</a>
+
+  <div class="section-header">
+    <h2 class="section-title" data-i18n="all.title">All Resources</h2>
+  </div>
+
+  <!-- FILTERS — type + project on a single line -->
+  <div class="filter-bar filter-bar-combined" style="margin-bottom:1.25rem">
+    <button class="filter-btn active" data-filter="type" data-value="all" data-i18n="common.all">All</button>
+    <button class="filter-btn" data-filter="type" data-value="alg" data-i18n="filter.algorithms">Algorithms</button>
+    <button class="filter-btn" data-filter="type" data-value="job" data-i18n="filter.jobAids">Job Aids</button>
+    <button class="filter-btn" data-filter="type" data-value="vid" data-i18n="filter.videos">Videos</button>
+    <button class="filter-btn" data-filter="type" data-value="pos" data-i18n="filter.posters">Posters</button>
+    <button class="filter-btn" data-filter="type" data-value="expert" data-i18n="filter.expert">Expert Pool</button>
+    <button class="filter-btn" data-filter="type" data-value="trunat" data-i18n="filter.trunat">Trunat</button>
+    <button class="filter-btn" data-filter="type" data-value="hiv" data-i18n="filter.hiv">HIV Pool</button>
+    <span class="filter-divider" aria-hidden="true"></span>
+    <button class="filter-btn active" data-filter="proj" data-value="all" data-i18n="common.allProjects">All projects</button>
+    <button class="filter-btn" data-filter="proj" data-value="breathe">BREATHE</button>
+    <button class="filter-btn" data-filter="proj" data-value="prompttb">PROMPT TB</button>
+  </div>
+
+  <div class="resource-panel">
+    <div class="resource-panel-header">
+      <h3 id="panelTitle">All Resources</h3>
+      <span id="resourceCount"></span>
+    </div>
+    <div id="resourceList"></div>
+  </div>
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/i18n.js"></script>
+<script src="../js/data.js"></script>
+<script>
+  document.getElementById("nav-placeholder").innerHTML = renderNav("resources");
+  document.getElementById("footer-placeholder").innerHTML = renderFooter();
+  applyI18n();
+  initNavSearch();
+
+  // Honour ?type=alg|job|vid|pos|expert|trunat|hiv|pool and ?proj=breathe|prompttb|rapidtb when arriving via a quick link.
+  // "pool" is a pseudo-type from the "Pool Tests" quick link — it shows all three pool categories at once.
+  const _params = new URLSearchParams(location.search);
+  const _initialType = _params.get("type");
+  const _initialProj = _params.get("proj");
+  let activeType = ["alg","job","vid","pos","expert","trunat","hiv","pool"].includes(_initialType) ? _initialType : "all";
+  let activeProj = ["breathe","prompttb","rapidtb"].includes(_initialProj) ? _initialProj : "all";
+
+  // Sync the active state of the filter buttons to the initial values
+  document.querySelectorAll(`[data-filter="type"]`).forEach(b => b.classList.toggle("active", b.dataset.value === activeType));
+  document.querySelectorAll(`[data-filter="proj"]`).forEach(b => b.classList.toggle("active", b.dataset.value === activeProj));
+
+  function matchesType(r) {
+    if (activeType === "all") return true;
+    if (activeType === "pool") return isPoolType(r.typeKey);
+    return r.typeKey === activeType;
+  }
+
+  function render() {
+    let filtered = RESOURCES.filter(r => matchesType(r) && (activeProj === "all" || r.project === activeProj));
+
+    const projName = activeProj === "all" ? t("common.allProjects") : PROJECTS.find(p => p.id === activeProj)?.name || "";
+    let typeName = "";
+    if (activeType === "pool") typeName = ` · ${t("tile.poolTests")}`;
+    else if (activeType !== "all") typeName = ` · ${typeLabel(activeType)}`;
+    document.getElementById("panelTitle").textContent = projName + typeName;
+    document.getElementById("resourceCount").textContent = tCount(filtered.length);
+
+    const list = document.getElementById("resourceList");
+    list.innerHTML = renderResourceTiles(filtered, activeProj === "all");
+  }
+
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const filter = btn.dataset.filter;
+      if (filter === "type") activeType = btn.dataset.value;
+      if (filter === "proj") activeProj = btn.dataset.value;
+      document.querySelectorAll(`[data-filter="${filter}"]`).forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      render();
+    });
+  });
+
+  render();
+</script>
+</body>
+</html>

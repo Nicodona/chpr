@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — CHPR Internal</title>
+  <link rel="stylesheet" href="../css/internal.css"/>
+  <style>
+    .welcome-banner {
+      background: linear-gradient(135deg, #0054A6 0%, #003d7a 100%);
+      border-radius: 14px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+    .welcome-banner h2 {
+      font-family: 'Sora', sans-serif;
+      font-size: 1.2rem; font-weight: 700; color: white;
+      margin-bottom: 0.3rem;
+    }
+    .welcome-banner p { font-size: 13px; color: rgba(255,255,255,0.75); }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .stat-num {
+      font-family: 'Sora', sans-serif;
+      font-size: 2rem; font-weight: 700;
+      color: var(--primary-light);
+      display: block;
+    }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .section-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 1rem; font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+    .quick-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .quick-link {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      text-decoration: none;
+      display: flex; align-items: center; gap: 12px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .quick-link:hover { border-color: var(--border-light); background: var(--surface-2); }
+    .quick-link-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .quick-link-icon svg { width: 18px; height: 18px; }
+    .quick-link h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 1px; }
+    .quick-link p { font-size: 12px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div id="nav-placeholder"></div>
+
+<main class="main">
+  <!-- WELCOME BANNER -->
+  <div class="welcome-banner" id="welcomeBanner">
+    <div>
+      <h2 id="welcomeTitle">Welcome back!</h2>
+      <p id="welcomeSubtitle">CHPR Internal Staff Portal</p>
+    </div>
+    <div id="welcomeAvatar"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="dashboard-grid" id="statsGrid"></div>
+
+  <!-- QUICK LINKS -->
+  <p class="section-title">Quick access</p>
+  <div class="quick-links" id="quickLinks"></div>
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/internal.js"></script>
+<script>
+  const user = requireAuth("../index.html");
+  // Staff don't have a dashboard — bounce them to the public site
+  if (user && user.role !== "admin") {
+    window.location.href = "../../index.html";
+  }
+  if (user && user.role === "admin") {
+    document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "dashboard");
+    document.getElementById("footer-placeholder").innerHTML = renderInternalFooter();
+
+    // Welcome
+    document.getElementById("welcomeTitle").textContent = `Welcome back, ${user.name.split(" ")[0]}!`;
+    document.getElementById("welcomeSubtitle").textContent = `You're signed in as ${user.name} · ${user.role}`;
+    document.getElementById("welcomeAvatar").innerHTML = avatarHtml(user.color, user.initials, 52);
+
+    // Stats
+    const pending = authGetPending().length;
+    const approved = authGetUsers().length;
+    document.getElementById("statsGrid").innerHTML = `
+      <div class="stat-card"><span class="stat-num">${pending}</span><span class="stat-label">Pending registrations</span></div>
+      <div class="stat-card"><span class="stat-num">${approved}</span><span class="stat-label">Approved users</span></div>
+      <div class="stat-card"><span class="stat-num">3</span><span class="stat-label">Active projects</span></div>
+    `;
+
+    // Quick links
+    document.getElementById("quickLinks").innerHTML = `
+      <a href="admin.html" class="quick-link">
+        <div><h4>Administration</h4><p>Review registrations & users</p></div>
+      </a>
+      <a href="../../index.html" class="quick-link">
+        <div><h4>Public Hub</h4><p>Browse project resources</p></div>
+      </a>
+      <a href="../../pages/all-resources.html" class="quick-link">
+        <div><h4>All resources</h4><p>Clinical tools & materials</p></div>
+      </a>
+    `;
+  }
+</script>
+</body>
+</html>

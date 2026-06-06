@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BREATHE Cameroon — CHPR Resources Hub</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div id="nav-placeholder"></div>
+
+<main class="main">
+  <a href="../index.html" class="back-link" data-i18n="common.backToHub">← Back to Hub</a>
+
+  <!-- PROJECT HERO CARD -->
+  <div class="project-hero">
+    <div class="project-hero-info">
+      <h1>BREATHE Cameroon</h1>
+      <p data-i18n="breathe.desc">Evidence-based clinical algorithms, job aids, and specialized respiratory health resources for screening and diagnosis across health facilities and community health camps in Cameroon.</p>
+      <div class="project-hero-meta">
+        <span class="badge badge-active" id="projectStatusBadge">Active</span>
+        <span class="badge badge-primary" data-i18n="badge.respiratory">Respiratory Health</span>
+        <span class="badge badge-primary" data-i18n="badge.chpr">CHPR</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS ROW -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- FILTER BAR -->
+  <div class="section-header">
+    <h2 class="section-title" data-i18n="common.resources">Resources</h2>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-label" data-i18n="proj.filterByType">Filter by type:</span>
+    <button class="filter-btn active" data-type="all" data-i18n="common.all">All</button>
+    <button class="filter-btn" data-type="alg" data-i18n="filter.algorithms">Algorithms</button>
+    <button class="filter-btn" data-type="job" data-i18n="filter.jobAids">Job Aids</button>
+    <button class="filter-btn" data-type="vid" data-i18n="filter.videos">Videos</button>
+    <button class="filter-btn" data-type="pos" data-i18n="filter.posters">Posters</button>
+    <button class="filter-btn" data-type="expert" data-i18n="filter.expert">Expert Pool</button>
+    <button class="filter-btn" data-type="trunat" data-i18n="filter.trunat">Trunat</button>
+    <button class="filter-btn" data-type="hiv" data-i18n="filter.hiv">HIV Pool</button>
+  </div>
+
+  <div class="filter-bar" style="margin-top:-0.5rem">
+    <span class="filter-label" data-i18n="proj.setting">Setting:</span>
+    <button class="filter-btn active" data-activity="all" data-i18n="proj.allSettings">All settings</button>
+    <button class="filter-btn" data-activity="hf" data-i18n="proj.healthFacilities">Health Facilities</button>
+    <button class="filter-btn" data-activity="hc" data-i18n="proj.healthCamps">Health Camps</button>
+  </div>
+
+  <div class="resource-panel">
+    <div class="resource-panel-header">
+      <h3>BREATHE Cameroon <span data-i18n="proj.resourcesSuffix">Resources</span></h3>
+      <span id="resourceCount"></span>
+    </div>
+    <div id="resourceList"></div>
+  </div>
+</main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/i18n.js"></script>
+<script src="../js/data.js"></script>
+<script>
+  document.getElementById("nav-placeholder").innerHTML = renderNav("breathe");
+  document.getElementById("footer-placeholder").innerHTML = renderFooter();
+  applyI18n();
+  initNavSearch();
+
+  const PROJECT_ID = "breathe";
+  const projectResources = RESOURCES.filter(r => r.project === PROJECT_ID);
+
+  // Reflect the project's admin-managed status (active / completed)
+  (function () {
+    const badge = document.getElementById("projectStatusBadge");
+    const st = projectStatus(PROJECT_ID);
+    badge.className = `badge badge-${st === "completed" ? "completed" : "active"}`;
+    badge.textContent = statusLabel(st);
+  })();
+
+  // Stats (grouped by type key so labels localize)
+  const typeBreakdown = {};
+  projectResources.forEach(r => { typeBreakdown[r.typeKey] = (typeBreakdown[r.typeKey] || 0) + 1; });
+  const statsRow = document.getElementById("statsRow");
+  statsRow.innerHTML = `<div class="stat-card"><span class="stat-num">${projectResources.length}</span><span class="stat-label">${t("proj.totalResources")}</span></div>`;
+  Object.entries(typeBreakdown).forEach(([typeKey, count]) => {
+    statsRow.innerHTML += `<div class="stat-card"><span class="stat-num">${count}</span><span class="stat-label">${typeLabel(typeKey)}</span></div>`;
+  });
+
+  let activeType = "all";
+  let activeActivity = "all";
+
+  function render() {
+    const filtered = projectResources.filter(r => {
+      const mt = activeType === "all" || r.typeKey === activeType;
+      const ma = activeActivity === "all" || r.activity === activeActivity;
+      return mt && ma;
+    });
+    document.getElementById("resourceCount").textContent = tCount(filtered.length);
+    document.getElementById("resourceList").innerHTML = renderResourceTiles(filtered, false);
+  }
+
+  document.querySelectorAll("[data-type]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeType = btn.dataset.type;
+      document.querySelectorAll("[data-type]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-activity]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeActivity = btn.dataset.activity;
+      document.querySelectorAll("[data-activity]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      render();
+    });
+  });
+
+  render();
+</script>
+</body>
+</html>

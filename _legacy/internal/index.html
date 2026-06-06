@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Staff Login — CHPR Resources Hub</title>
+  <link rel="stylesheet" href="css/internal.css"/>
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+
+    <div class="login-logo">
+      <div class="login-logo-mark">CH</div>
+      <div class="login-logo-text">
+        CHPR Resources Hub
+        <span>Internal Staff Portal</span>
+      </div>
+    </div>
+
+    <h2>Sign in to your account</h2>
+    <p class="subtitle">Access the CHPR internal management portal and staff tools.</p>
+
+    <div class="login-success" id="loginSuccess" style="display:none"></div>
+    <div class="login-info" id="loginInfo"></div>
+    <div class="login-error" id="loginError">Incorrect username or password. Please try again.</div>
+
+    <div class="form-group">
+      <label class="form-label" for="username">Username</label>
+      <input class="form-input" type="text" id="username" placeholder="Enter your username" autocomplete="username"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="password">Password</label>
+      <input class="form-input" type="password" id="password" placeholder="Enter your password" autocomplete="current-password"/>
+    </div>
+
+    <button class="btn-primary" id="loginBtn">Sign in</button>
+
+    <div class="register-link-wrap">
+      Don't have an account? <a href="pages/register.html">Register</a>
+    </div>
+
+    <!-- Demo hint -->
+    <div class="demo-hint">
+      <p>Seeded demo accounts — click to fill credentials:</p>
+      <div class="demo-users">
+        <div class="demo-user" onclick="fillDemo('nico','tb2026')">
+          <div class="demo-user-info">
+            <strong>Nico (Admin)</strong>
+            nico / tb2026
+          </div>
+          <span class="role-badge role-admin">admin</span>
+        </div>
+        <div class="demo-user" onclick="fillDemo('njei','chpr2026')">
+          <div class="demo-user-info">
+            <strong>Njei (Admin)</strong>
+            njei / chpr2026
+          </div>
+          <span class="role-badge role-admin">admin</span>
+        </div>
+        <div class="demo-user" onclick="fillDemo('nchang','chpr2026')">
+          <div class="demo-user-info">
+            <strong>Nchang Evon (Staff)</strong>
+            nchang / chpr2026
+          </div>
+          <span class="role-badge role-staff">staff</span>
+        </div>
+        <div class="demo-user" onclick="fillDemo('armand','chpr2026')">
+          <div class="demo-user-info">
+            <strong>Armand Forkwa (Staff)</strong>
+            armand / chpr2026
+          </div>
+          <span class="role-badge role-staff">staff</span>
+        </div>
+        <div class="demo-user" onclick="fillDemo('viewer','view2026')">
+          <div class="demo-user-info">
+            <strong>Guest Viewer (Read-only)</strong>
+            viewer / view2026
+          </div>
+          <span class="role-badge role-viewer">viewer</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulated inbox: lets a registered user check approval-status emails on this prototype -->
+    <details class="inbox-peek">
+      <summary>📬 Check notification inbox (prototype email simulator)</summary>
+      <div class="inbox-peek-form">
+        <input class="form-input" type="email" id="inboxEmail" placeholder="Enter the email you registered with"/>
+        <button id="inboxCheckBtn">Check</button>
+      </div>
+      <div class="inbox-peek-results" id="inboxResults"></div>
+    </details>
+
+    <div style="margin-top:1.5rem;text-align:center">
+      <a href="../index.html" style="font-size:12px;color:var(--text-muted);text-decoration:none">← Back to public site</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/internal.js"></script>
+<script>
+  // Where to send the user after login: public site (?return=public), admin dashboard, or staff discussions
+  const _params = new URLSearchParams(location.search);
+  const _returnToPublic = _params.get("return") === "public";
+  function _postLoginHref(user) {
+    if (_returnToPublic) return "../index.html";
+    // Discussions is unlinked, so non-admins go straight to the public site.
+    return user && user.role === "admin" ? "pages/dashboard.html" : "../index.html";
+  }
+
+  // Already logged in? Skip straight to the right destination
+  const _existing = authGetUser();
+  if (_existing) window.location.href = _postLoginHref(_existing);
+
+  // Surface flash messages from registration / approval flows via ?msg=…
+  (function() {
+    const params = _params;
+    const msg = params.get("msg");
+    if (msg === "registered") {
+      const el = document.getElementById("loginSuccess");
+      el.textContent = "Registration submitted. Your account is now pending administrator approval — you'll be notified by email once it's reviewed.";
+      el.style.display = "block";
+    } else if (msg === "approved") {
+      const el = document.getElementById("loginSuccess");
+      el.textContent = "Your account has been approved. Please sign in below.";
+      el.style.display = "block";
+    } else if (msg === "logged_out") {
+      const el = document.getElementById("loginSuccess");
+      el.textContent = "You have been signed out.";
+      el.style.display = "block";
+    }
+  })();
+
+  function fillDemo(u, p) {
+    document.getElementById("username").value = u;
+    document.getElementById("password").value = p;
+    document.getElementById("username").focus();
+  }
+
+  function doLogin() {
+    document.getElementById("loginError").style.display = "none";
+    document.getElementById("loginInfo").style.display = "none";
+
+    const u = document.getElementById("username").value.trim();
+    const p = document.getElementById("password").value;
+    const result = authLogin(u, p);
+
+    if (result.ok) {
+      window.location.href = _postLoginHref(result.user);
+      return;
+    }
+
+    if (result.reason === "pending") {
+      const info = document.getElementById("loginInfo");
+      info.textContent = result.message;
+      info.style.display = "block";
+    } else {
+      document.getElementById("loginError").textContent = result.message;
+      document.getElementById("loginError").style.display = "block";
+    }
+    document.getElementById("password").value = "";
+    document.getElementById("password").focus();
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", doLogin);
+  document.getElementById("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  document.getElementById("username").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("password").focus(); });
+
+  // Inbox peek (demo notification check)
+  function renderInbox() {
+    const email = document.getElementById("inboxEmail").value.trim();
+    const out = document.getElementById("inboxResults");
+    if (!email) { out.innerHTML = `<div class="inbox-empty">Enter an email address above.</div>`; return; }
+    const msgs = authGetEmailsFor(email);
+    if (msgs.length === 0) {
+      out.innerHTML = `<div class="inbox-empty">No notifications for that address yet.</div>`;
+      return;
+    }
+    out.innerHTML = msgs.map(m => `
+      <div class="inbox-msg">
+        <div class="inbox-msg-subject">${escapeHtml(m.subject)}</div>
+        <div class="inbox-msg-time">${new Date(m.sentAt).toLocaleString()}</div>
+        <div class="inbox-msg-body">${escapeHtml(m.body)}</div>
+      </div>`).join("");
+  }
+  document.getElementById("inboxCheckBtn").addEventListener("click", renderInbox);
+  document.getElementById("inboxEmail").addEventListener("keydown", e => { if (e.key === "Enter") renderInbox(); });
+</script>
+</body>
+</html>

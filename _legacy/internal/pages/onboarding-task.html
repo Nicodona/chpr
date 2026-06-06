@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Onboarding task — CHPR Internal</title>
+  <link rel="stylesheet" href="../css/internal.css"/>
+</head>
+<body class="light-theme">
+<div id="nav-placeholder"></div>
+
+<main class="main" id="taskMain"></main>
+
+<div id="footer-placeholder"></div>
+
+<script src="../js/internal.js"></script>
+<script>
+  const user = requireAuth("../index.html");
+  if (user) {
+    document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "onboarding");
+    document.getElementById("footer-placeholder").innerHTML = renderInternalFooter();
+
+    const params = new URLSearchParams(location.search);
+    const taskId = params.get("task");
+    const requested = params.get("user");
+    const isAdmin = user.role === "admin";
+    const targetName = (isAdmin && requested) ? requested : user.username;
+    const adminPreview = isAdmin && !!requested && requested.toLowerCase() !== user.username.toLowerCase();
+    const backHref = "onboarding.html" + (adminPreview ? `?user=${encodeURIComponent(requested)}` : "");
+
+    let feedback = null;        // transient quiz feedback for the current view
+    let countdownTimer = null;  // interval handle for the lock countdown
+
+    const backLink = `<a class="back-link" href="${backHref}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Back to onboarding</a>`;
+
+    function fmtCountdown(ms) {
+      const s = Math.max(0, Math.ceil(ms / 1000));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${m}:${String(r).padStart(2, "0")}`;
+    }
+
+    function resourceRow(r) {
+      return `
+        <div class="ob-resource">
+          <div class="ob-resource-info">
+            <div class="ob-resource-title">
+              <span class="ob-type ob-type-${r.type}">${obResourceTypeLabel(r.type)}</span>
+              ${escapeHtml(r.title)}
+            </div>
+            ${r.desc ? `<div class="ob-resource-desc">${escapeHtml(r.desc)}</div>` : ""}
+          </div>
+          ${r.url ? `<a class="ob-open" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">Open ↗</a>` : `<span class="ob-soon">Coming soon</span>`}
+        </div>`;
+    }
+
+    function render() {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      const main = document.getElementById("taskMain");
+      const rec = onboardingGet(targetName);
+
+      if (!rec) {
+        main.innerHTML = `${backLink}<div class="admin-empty">No onboarding record found.</div>`;
+        return;
+      }
+      const task = obResolveTask(rec, taskId);
+      if (!task) {
+        main.innerHTML = `${backLink}<div class="admin-empty">This task could not be found.</div>`;
+        return;
+      }
+
+      const st = obQuizState(task);
+      const status = task.done
+        ? { cls: "done", txt: "Completed" }
+        : (st.locked ? { cls: "locked", txt: "Locked" } : { cls: "prog", txt: "In progress" });
+
+      const header = `
+        <div class="obt-header">
+          <span class="ob-cat">${escapeHtml(task.category)}</span>
+          <h1>${escapeHtml(task.title)}</h1>
+          <span class="obt-status obt-status-${status.cls}">${status.txt}</span>
+        </div>
+        ${task.desc ? `<p class="obt-lead">${escapeHtml(task.desc)}</p>` : ""}`;
+
+      const details = task.details
+        ? `<div class="obt-block"><h3>How to complete this task</h3><p>${escapeHtml(task.details).replace(/\n/g, "<br>")}</p></div>`
+        : "";
+
+      const resources = (task.resources && task.resources.length)
+        ? `<div class="ob-section"><div class="ob-section-head"><h3 class="ob-section-title">Helpful materials</h3></div>${task.resources.map(resourceRow).join("")}</div>`
+        : "";
+
+      let interactive = "";
+
+      if (task.quiz && task.quiz.length) {
+        interactive = renderQuiz(task, st);
+      } else {
+        // Non-quiz task: a simple completion toggle
+        interactive = `
+          <div class="obt-block obt-complete">
+            <div>
+              <h3>Mark this task</h3>
+              <p>${task.done ? "You've completed this task." : "Once you've done everything above, mark this task complete."}</p>
+            </div>
+            <button class="btn-submit ${task.done ? "is-undo" : ""}" id="toggleDone">${task.done ? "Mark as not complete" : "Mark as complete"}</button>
+          </div>`;
+      }
+
+      main.innerHTML = backLink + header + details + resources + interactive;
+      wire(task, st);
+    }
+
+    function renderQuiz(task, st) {
+      const heading = `<div class="ob-section-head"><h3 class="ob-section-title">Test your understanding</h3></div>`;
+
+      // Admin preview: read-only with correct answers highlighted
+      if (adminPreview) {
+        return `<div class="ob-section">${heading}
+          <p class="obt-quiz-note">Admin preview — correct answers are highlighted. Employees must answer all questions correctly (3 attempts) to auto-complete this task.</p>
+          ${task.quiz.map((q, qi) => `
+            <div class="obt-q">
+              <div class="obt-q-text">${qi + 1}. ${escapeHtml(q.q)}</div>
+              <div class="obt-opts">
+                ${q.options.map((o, oi) => `
+                  <label class="obt-opt ${oi === Number(q.answer) ? "correct" : ""}">
+                    <input type="radio" disabled ${oi === Number(q.answer) ? "checked" : ""}/>
+                    <span>${escapeHtml(o)}${oi === Number(q.answer) ? ` <span class="obt-correct-tag">correct</span>` : ""}</span>
+                  </label>`).join("")}
+              </div>
+            </div>`).join("")}
+        </div>`;
+      }
+
+      // Employee already passed
+      if (task.passed || task.done) {
+        return `<div class="ob-section">${heading}
+          <div class="obt-banner success">✓ You've passed this check — the task is complete. Great work!</div>
+        </div>`;
+      }
+
+      // Locked: study-and-retry cooldown (live countdown wired in wire())
+      if (st.locked) {
+        return `<div class="ob-section">${heading}
+          <div class="obt-banner locked">
+            You've used all ${QUIZ_MAX_ATTEMPTS} attempts. Please review the materials above and try again in
+            <strong id="obCountdown">${fmtCountdown(st.remainingMs)}</strong>.
+          </div>
+        </div>`;
+      }
+
+      // Active quiz form
+      const banner = feedbackBanner(task);
+      const marks = (feedback && feedback.kind === "fail" && feedback.perQ) ? feedback.perQ : null;
+
+      return `<div class="ob-section">${heading}
+        ${banner}
+        <form id="quizForm" class="obt-quiz">
+          ${task.quiz.map((q, qi) => `
+            <div class="obt-q">
+              <div class="obt-q-text">
+                ${qi + 1}. ${escapeHtml(q.q)}
+                ${marks ? `<span class="obt-mark ${marks[qi] ? "ok" : "no"}">${marks[qi] ? "✓" : "✗"}</span>` : ""}
+              </div>
+              <div class="obt-opts">
+                ${q.options.map((o, oi) => `
+                  <label class="obt-opt">
+                    <input type="radio" name="q-${qi}" value="${oi}"/>
+                    <span>${escapeHtml(o)}</span>
+                  </label>`).join("")}
+              </div>
+            </div>`).join("")}
+          <div class="obt-actions">
+            <button type="button" class="btn-submit" id="quizSubmit">Submit answers</button>
+            <span class="obt-attempts">${st.attemptsLeft} of ${QUIZ_MAX_ATTEMPTS} attempt${st.attemptsLeft !== 1 ? "s" : ""} left</span>
+          </div>
+        </form>
+      </div>`;
+    }
+
+    function feedbackBanner(task) {
+      if (!feedback) return "";
+      if (feedback.kind === "answerall") return `<div class="obt-banner warn">Please answer every question before submitting.</div>`;
+      if (feedback.kind === "fail") return `<div class="obt-banner error">You got ${feedback.correct} of ${feedback.total} correct. All answers must be correct to pass — review the materials above and try again.</div>`;
+      return "";
+    }
+
+    function wire(task, st) {
+      const toggleBtn = document.getElementById("toggleDone");
+      if (toggleBtn) {
+        toggleBtn.addEventListener("click", () => {
+          onboardingToggleTask(targetName, taskId);
+          feedback = null;
+          render();
+          if (!adminPreview) document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "onboarding");
+        });
+      }
+
+      const submitBtn = document.getElementById("quizSubmit");
+      if (submitBtn) {
+        submitBtn.addEventListener("click", () => {
+          const answers = [];
+          let unanswered = false;
+          task.quiz.forEach((q, qi) => {
+            const c = document.querySelector(`input[name="q-${qi}"]:checked`);
+            if (!c) unanswered = true;
+            answers[qi] = c ? Number(c.value) : -1;
+          });
+          if (unanswered) { feedback = { kind: "answerall" }; render(); return; }
+
+          const r = obSubmitQuiz(targetName, taskId, answers);
+          if (r.passed) feedback = { kind: "pass" };
+          else if (r.locked) feedback = { kind: "locked" };
+          else feedback = { kind: "fail", correct: r.correct, total: r.total, attemptsLeft: r.attemptsLeft, perQ: r.perQ };
+          render();
+          if (!adminPreview) document.getElementById("nav-placeholder").innerHTML = renderInternalNav(user, "onboarding");
+        });
+      }
+
+      // Live countdown while locked
+      if (!adminPreview && st && st.locked) {
+        const lockedUntil = st.lockedUntil;
+        countdownTimer = setInterval(() => {
+          const left = lockedUntil - Date.now();
+          const el = document.getElementById("obCountdown");
+          if (left <= 0) { clearInterval(countdownTimer); countdownTimer = null; feedback = null; render(); return; }
+          if (el) el.textContent = fmtCountdown(left);
+        }, 1000);
+      }
+    }
+
+    render();
+  }
+</script>
+</body>
+</html>
