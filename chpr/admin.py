@@ -1,7 +1,7 @@
 """Django admin registrations for the CHPR Resources Hub."""
 from django.contrib import admin
 
-from .models import ContactMessage, Project, Resource, ResourceComment
+from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceInteraction, SiteVisit
 
 
 class ResourceInline(admin.TabularInline):
@@ -57,3 +57,32 @@ class ContactMessageAdmin(admin.ModelAdmin):
     list_editable = ("handled",)
     search_fields = ("name", "email", "message")
     readonly_fields = ("created_at",)
+
+
+@admin.register(FAQ)
+class FAQAdmin(admin.ModelAdmin):
+    list_display = ("question_short", "order", "is_active", "created_at")
+    list_editable = ("order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("question", "answer")
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Question")
+    def question_short(self, obj):
+        return obj.question[:80]
+
+
+@admin.register(SiteVisit)
+class SiteVisitAdmin(admin.ModelAdmin):
+    list_display = ("user_type", "page", "ip_address", "timestamp")
+    list_filter = ("user_type",)
+    readonly_fields = ("timestamp",)
+    date_hierarchy = "timestamp"
+
+
+@admin.register(ResourceInteraction)
+class ResourceInteractionAdmin(admin.ModelAdmin):
+    list_display = ("interaction_type", "resource", "user_type", "timestamp")
+    list_filter = ("interaction_type", "user_type")
+    readonly_fields = ("timestamp",)
+    date_hierarchy = "timestamp"

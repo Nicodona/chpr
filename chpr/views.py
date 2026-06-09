@@ -1,12 +1,16 @@
 """DRF viewsets and auth views for the CHPR Resources Hub API."""
 import secrets
 import string
+from collections import defaultdict
+from datetime import timedelta
 
 from django.conf import settings as django_settings
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -16,11 +20,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceInteraction, SiteVisit, StaffProfile
 from .serializers import (
     ChangePasswordSerializer,
     ContactMessageSerializer,
     CreateUserSerializer,
+    FAQSerializer,
     LoginSerializer,
     ProjectSerializer,
     QuizQuestionAdminSerializer,
@@ -481,3 +486,188 @@ class ContactMessageViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return [AllowAny()]
         return [IsAuthenticated()]
+
+
+# ---------------------------------------------------------------------------
+# FAQ
+# ---------------------------------------------------------------------------
+
+class FAQViewSet(viewsets.ModelViewSet):
+    """
+    FAQs. Public reads; admin-only writes.
+    Non-admins only see active FAQs.
+    """
+    serializer_class = FAQSerializer
+    authentication_classes = AUTH_BACKENDS
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated and _is_admin(self.request.user):
+            return FAQ.objects.all()
+        return FAQ.objects.filter(is_active=True)
+
+    def perform_create(self, serializer):
+        if not _is_admin(self.request.user):
+            raise PermissionDenied("Admin access required.")
+        serializer.save()
+
+    def perform_update(self, serializer):
+        if not _is_admin(self.request.user):
+            raise PermissionDenied("Admin access required.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if not _is_admin(self.request.user):
+            raise PermissionDenied("Admin access required.")
+        instance.delete()
+
+
+# ---------------------------------------------------------------------------
+# Analytics – tracking + reporting
+# ---------------------------------------------------------------------------
+
+def _get_client_ip(request):
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
+
+def _get_date_range(period):
+    now = timezone.now()
+    if period == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "this_week":
+        start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "last_7_days":
+        start = now - timedelta(days=7)
+    elif period == "this_month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif period == "last_30_days":
+        start = now - timedelta(days=30)
+    elif period == "three_months":
+        start = now - timedelta(days=90)
+    else:
+        start = now - timedelta(days=7)
+    return start, now
+
+
+class TrackVisitView(APIView):
+    """
+    POST /api/analytics/track/
+    Public. Records a page visit.
+    Body: { page, user_type, session_key }
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = AUTH_BACKENDS
+
+    def post(self, request):
+        SiteVisit.objects.create(
+            user_type=request.data.get("user_type", "visitor"),
+            page=request.data.get("page", "")[:500],
+            ip_address=_get_client_ip(request),
+            session_key=request.data.get("session_key", "")[:64],
+        )
+        return Response({"ok": True}, status=status.HTTP_201_CREATED)
+
+
+class TrackInteractionView(APIView):
+    """
+    POST /api/analytics/interaction/
+    Public. Records a resource view or share.
+    Body: { resource, interaction_type, user_type, session_key }
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = AUTH_BACKENDS
+
+    def post(self, request):
+        resource_id = request.data.get("resource")
+        interaction_type = request.data.get("interaction_type", "view")
+        if not resource_id:
+            return Response({"error": "resource required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            resource = Resource.objects.get(pk=resource_id)
+        except Resource.DoesNotExist:
+            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+        ResourceInteraction.objects.create(
+            resource=resource,
+            interaction_type=interaction_type,
+            user_type=request.data.get("user_type", "visitor"),
+            session_key=request.data.get("session_key", "")[:64],
+        )
+        return Response({"ok": True}, status=status.HTTP_201_CREATED)
+
+
+class AnalyticsView(APIView):
+    """
+    GET /api/analytics/?period=last_7_days
+    Admin-only. Returns traffic and resource interaction data.
+    """
+    authentication_classes = AUTH_BACKENDS
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_admin(request.user):
+            return Response({"detail": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
+
+        period = request.query_params.get("period", "last_7_days")
+        start, end = _get_date_range(period)
+
+        visits_qs = SiteVisit.objects.filter(timestamp__gte=start, timestamp__lte=end)
+
+        # Summary counts
+        summary_raw = visits_qs.values("user_type").annotate(count=Count("id"))
+        summary = {"total": 0, "visitor": 0, "staff": 0, "admin": 0, "unique_sessions": 0}
+        for row in summary_raw:
+            summary[row["user_type"]] = row["count"]
+            summary["total"] += row["count"]
+        summary["unique_sessions"] = visits_qs.exclude(session_key="").values("session_key").distinct().count()
+
+        # Daily breakdown
+        daily_raw = (
+            visits_qs
+            .annotate(date=TruncDate("timestamp"))
+            .values("date", "user_type")
+            .annotate(count=Count("id"))
+            .order_by("date")
+        )
+        daily_dict = defaultdict(lambda: {"visitor": 0, "staff": 0, "admin": 0, "total": 0})
+        for row in daily_raw:
+            date_str = row["date"].isoformat()
+            ut = row["user_type"]
+            cnt = row["count"]
+            daily_dict[date_str][ut] += cnt
+            daily_dict[date_str]["total"] += cnt
+        daily = sorted(
+            [{"date": k, **v} for k, v in daily_dict.items()],
+            key=lambda x: x["date"],
+        )
+
+        # Top resources by interactions
+        interactions_qs = ResourceInteraction.objects.filter(timestamp__gte=start, timestamp__lte=end)
+        top_raw = (
+            interactions_qs
+            .values("resource__id", "resource__name", "resource__project__name")
+            .annotate(
+                views=Count("id", filter=Q(interaction_type="view")),
+                shares=Count("id", filter=Q(interaction_type="share")),
+            )
+            .order_by("-views")[:10]
+        )
+        top_resources = [
+            {
+                "id": r["resource__id"],
+                "name": r["resource__name"],
+                "project_name": r["resource__project__name"],
+                "views": r["views"],
+                "shares": r["shares"],
+            }
+            for r in top_raw
+        ]
+
+        return Response({
+            "period": period,
+            "summary": summary,
+            "daily": daily,
+            "top_resources": top_resources,
+        })

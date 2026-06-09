@@ -237,3 +237,58 @@ export async function submitQuiz(resourceId, answers) {
     body: JSON.stringify({ answers }),
   });
 }
+
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+
+export async function fetchFAQs() {
+  const res = await fetch(`${BASE}/api/faq/`);
+  if (!res.ok) throw new Error("Failed to fetch FAQs");
+  const data = await res.json();
+  return data.results ?? data;
+}
+
+// ── Analytics & Tracking ──────────────────────────────────────────────────────
+
+function getSessionKey() {
+  let key = sessionStorage.getItem("chpr_session");
+  if (!key) {
+    key = crypto.randomUUID();
+    sessionStorage.setItem("chpr_session", key);
+  }
+  return key;
+}
+
+export async function trackVisit(page, userType = "visitor") {
+  try {
+    await fetch(`${BASE}/api/analytics/track/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ page, user_type: userType, session_key: getSessionKey() }),
+    });
+  } catch {
+    // tracking errors must never break the UI
+  }
+}
+
+export async function trackInteraction(resourceId, interactionType, userType = "visitor") {
+  try {
+    await fetch(`${BASE}/api/analytics/interaction/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        resource: resourceId,
+        interaction_type: interactionType,
+        user_type: userType,
+        session_key: getSessionKey(),
+      }),
+    });
+  } catch {
+    // tracking errors must never break the UI
+  }
+}
+
+export async function fetchAnalytics(period = "last_7_days") {
+  return authedFetch(`/api/analytics/?period=${period}`);
+}

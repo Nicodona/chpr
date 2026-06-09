@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { TYPE_CLASS, TYPE_LABELS } from "../constants";
+import { trackInteraction } from "../api";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -557,6 +558,17 @@ function CommentSection({ resourceId, user }) {
     }
   }
 
+  if (!user) {
+    return (
+      <div className="rd-comments">
+        <h3 className="rd-section-title">Comments</h3>
+        <p className="rd-comment-guest">
+          Comments are available to registered users only. Please contact your administrator for access.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rd-comments">
       <h3 className="rd-section-title">Comments</h3>
@@ -585,30 +597,24 @@ function CommentSection({ resourceId, user }) {
         </div>
       )}
 
-      {user ? (
-        <form className="rd-comment-form" onSubmit={handlePost}>
-          <p className="rd-comment-form-title">Post a comment</p>
-          <textarea
-            rows={3}
-            placeholder="Write your comment…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            style={{ width: "100%", resize: "vertical" }}
-          />
-          {postError && (
-            <p style={{ color: "red", fontSize: "0.875rem" }}>{postError}</p>
-          )}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-            <button type="submit" className="rd-quiz-btn rd-quiz-btn-active" disabled={posting || !body.trim()}>
-              {posting ? "Posting…" : "Post comment"}
-            </button>
-          </div>
-        </form>
-      ) : (
-        <p className="rd-comment-guest">
-          <Link to="/login">Sign in</Link> to post a comment.
-        </p>
-      )}
+      <form className="rd-comment-form" onSubmit={handlePost}>
+        <p className="rd-comment-form-title">Post a comment</p>
+        <textarea
+          rows={3}
+          placeholder="Write your comment…"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          style={{ width: "100%", resize: "vertical" }}
+        />
+        {postError && (
+          <p style={{ color: "red", fontSize: "0.875rem" }}>{postError}</p>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+          <button type="submit" className="rd-quiz-btn rd-quiz-btn-active" disabled={posting || !body.trim()}>
+            {posting ? "Posting…" : "Post comment"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -637,13 +643,15 @@ export default function ResourceDetail() {
         if (!res.ok) throw new Error("Resource not found");
         const data = await res.json();
         setResource(data);
+        const userType = user ? (user.role === "admin" ? "admin" : "staff") : "visitor";
+        trackInteraction(data.id, "view", userType);
       } catch (e) {
         setError(e.message || "Failed to load resource.");
       } finally {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load progress: API first (if authenticated), then cookie/localStorage
   useEffect(() => {
@@ -705,17 +713,20 @@ export default function ResourceDetail() {
   async function handleShare() {
     const url = window.location.href;
     if (navigator.share) {
-      try { await navigator.share({ title: resource?.name, url }); return; } catch (e) {
+      try { await navigator.share({ title: resource?.name, url }); } catch (e) {
         if (e.name === "AbortError") return;
       }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        const inp = document.createElement("input");
+        inp.value = url; document.body.appendChild(inp);
+        inp.select(); document.execCommand("copy"); document.body.removeChild(inp);
+      }
     }
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      const inp = document.createElement("input");
-      inp.value = url; document.body.appendChild(inp);
-      inp.select(); document.execCommand("copy"); document.body.removeChild(inp);
-    }
+    const userType = user ? (user.role === "admin" ? "admin" : "staff") : "visitor";
+    if (resource?.id) trackInteraction(resource.id, "share", userType);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }

@@ -7,34 +7,34 @@ import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 
 const PUBLIC_TILES = [
-  { to:"/resources",          mark:"All",  label:"Browse all",   color:"#46556e", bg:"#eef1f6" },
-  { to:"/resources?type=alg", mark:"Alg",  label:"Algorithms",   color:"#0054A6", bg:"#e6f1fb" },
-  { to:"/resources?type=job", mark:"Job",  label:"Job Aids",     color:"#0f6e56", bg:"#e1f5ee" },
-  { to:"/resources?type=vid", mark:"Vid",  label:"Videos",       color:"#46556e", bg:"#eef1f6" },
-  { to:"/resources?type=pool",mark:"Pool", label:"Pool Tests",   color:"#8a5410", bg:"#faeeda" },
+  { to:"/resources",          mark:"All", label:"Browse all",   color:"#46556e", bg:"#eef1f6" },
+  { to:"/resources?type=alg", mark:"A",   label:"Algorithms",   color:"#0054A6", bg:"#e6f1fb" },
+  { to:"/resources?type=job", mark:"J",   label:"Job Aids",     color:"#0f6e56", bg:"#e1f5ee" },
+  { to:"/resources?type=vid", mark:"V",   label:"Videos",       color:"#46556e", bg:"#eef1f6" },
+  { to:"/resources?type=pool",mark:"P",   label:"Pool Tests",   color:"#8a5410", bg:"#faeeda" },
 ];
-const ADMIN_TILE = { to:"/manage", mark:"⚙", label:"Admin Panel", color:"#0f172a", bg:"#334155", isAdmin:true };
+const ADMIN_TILE = { to:"/manage", mark:"Mg", label:"Admin Panel", color:"#0f172a", bg:"#334155", isAdmin:true };
 
-// TB education info-cards — icon + title + description; duplicated in JSX for seamless loop
+// TB education info-cards — monogram + title + description; duplicated in JSX for seamless loop
 const TICKER_TOP = [
-  { icon:"🤧", title:"Cover your cough",     desc:"Use your inner elbow to block respiratory droplets from spreading." },
-  { icon:"😷", title:"Wear a mask",           desc:"Essential in crowded or poorly ventilated indoor spaces." },
-  { icon:"🪟", title:"Improve ventilation",   desc:"Open windows and doors — fresh air dilutes airborne TB bacteria." },
-  { icon:"🧪", title:"Sputum collection",     desc:"Collect early morning on an empty stomach for the best sample." },
-  { icon:"💊", title:"Complete treatment",    desc:"Never stop TB medication early — it prevents dangerous resistance." },
-  { icon:"🏥", title:"Isolate when ill",      desc:"Stay home and wear a mask until you are no longer infectious." },
-  { icon:"🌡️",title:"Know the symptoms",     desc:"Persistent cough, night sweats, fever, unexplained weight loss." },
-  { icon:"🤝", title:"Know your status",      desc:"Early testing leads to early treatment and full recovery." },
+  { icon:"CC", title:"Cover your cough",     desc:"Use your inner elbow to block respiratory droplets from spreading." },
+  { icon:"WM", title:"Wear a mask",           desc:"Essential in crowded or poorly ventilated indoor spaces." },
+  { icon:"IV", title:"Improve ventilation",   desc:"Open windows and doors — fresh air dilutes airborne TB bacteria." },
+  { icon:"SC", title:"Sputum collection",     desc:"Collect early morning on an empty stomach for the best sample." },
+  { icon:"CT", title:"Complete treatment",    desc:"Never stop TB medication early — it prevents dangerous resistance." },
+  { icon:"IW", title:"Isolate when ill",      desc:"Stay home and wear a mask until you are no longer infectious." },
+  { icon:"KS", title:"Know the symptoms",     desc:"Persistent cough, night sweats, fever, unexplained weight loss." },
+  { icon:"KY", title:"Know your status",      desc:"Early testing leads to early treatment and full recovery." },
 ];
 const TICKER_BOTTOM = [
-  { icon:"🔬", title:"Early diagnosis",       desc:"Getting tested quickly saves lives — TB is curable when caught early." },
-  { icon:"💉", title:"BCG vaccination",       desc:"Protects infants and children against severe forms of tuberculosis." },
-  { icon:"📋", title:"Follow your plan",      desc:"Take every prescribed dose daily — consistency is the key to cure." },
-  { icon:"🍎", title:"Nutrition matters",     desc:"A healthy, balanced diet helps your immune system fight TB faster." },
-  { icon:"👨‍⚕️",title:"See a clinician",    desc:"Don't wait — consult a healthcare worker for any cough over 2 weeks." },
-  { icon:"🌍", title:"TB is curable",         desc:"With proper treatment 95% of TB patients make a full recovery." },
-  { icon:"🧬", title:"GeneXpert testing",     desc:"Rapid molecular test detects TB and drug resistance in under 2 hours." },
-  { icon:"❤️", title:"End TB together",       desc:"Community awareness and action are the key to eliminating tuberculosis." },
+  { icon:"ED", title:"Early diagnosis",       desc:"Getting tested quickly saves lives — TB is curable when caught early." },
+  { icon:"BG", title:"BCG vaccination",       desc:"Protects infants and children against severe forms of tuberculosis." },
+  { icon:"FP", title:"Follow your plan",      desc:"Take every prescribed dose daily — consistency is the key to cure." },
+  { icon:"NM", title:"Nutrition matters",     desc:"A healthy, balanced diet helps your immune system fight TB faster." },
+  { icon:"SC", title:"See a clinician",       desc:"Don't wait — consult a healthcare worker for any cough over 2 weeks." },
+  { icon:"TC", title:"TB is curable",         desc:"With proper treatment 95% of TB patients make a full recovery." },
+  { icon:"GX", title:"GeneXpert testing",     desc:"Rapid molecular test detects TB and drug resistance in under 2 hours." },
+  { icon:"ET", title:"End TB together",       desc:"Community awareness and action are the key to eliminating tuberculosis." },
 ];
 
 export default function Home() {
@@ -67,7 +67,7 @@ export default function Home() {
               {[...TICKER_BOTTOM, ...TICKER_BOTTOM].map((item, i) => (
                 <div key={i} className="htic-card">
                   <div className="htic-icon-wrap">
-                    <span className="htic-emoji">{item.icon}</span>
+                    <span className="htic-monogram">{item.icon}</span>
                   </div>
                   <div className="htic-info">
                     <div className="htic-title">{item.title}</div>
@@ -81,18 +81,9 @@ export default function Home() {
 
         {/* Foreground — centered content */}
         <div className="hero-fg">
-          <div className="hero-anim-badge">
-            <span className="hero-anim-badge-dot" />
-            CHPR Resources Hub
-          </div>
-
           <h1 className="hero-anim-title">
-            Fighting TB<br /><span className="hero-anim-title-accent">Together</span>
+            Fighting TB <span className="hero-anim-title-accent">Together</span>
           </h1>
-
-          <p className="hero-anim-sub">
-            Empowering healthcare workers with tools, protocols, and evidence-based resources to end tuberculosis.
-          </p>
 
           <div className="hero-search hero-anim-search">
             <svg className="hero-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

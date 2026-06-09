@@ -226,3 +226,60 @@ class QuizAttempt(models.Model):
 
     def __str__(self):
         return f"{self.user.username} – {self.resource_id} – {self.percent}%"
+
+
+class FAQ(models.Model):
+    """Frequently Asked Questions managed by admins, visible to all."""
+    question = models.CharField(max_length=500)
+    answer = models.TextField()
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "created_at"]
+        verbose_name = "FAQ"
+        verbose_name_plural = "FAQs"
+
+    def __str__(self):
+        return self.question[:80]
+
+
+class SiteVisit(models.Model):
+    """Tracks every page visit for traffic analytics."""
+    USER_TYPE_CHOICES = [
+        ("visitor", "Visitor"),
+        ("staff", "Staff"),
+        ("admin", "Admin"),
+    ]
+    timestamp = models.DateTimeField(auto_now_add=True)
+    user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default="visitor")
+    page = models.CharField(max_length=500, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    session_key = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.user_type} @ {self.page} [{self.timestamp:%Y-%m-%d %H:%M}]"
+
+
+class ResourceInteraction(models.Model):
+    """Tracks views and shares per resource for analytics."""
+    INTERACTION_CHOICES = [
+        ("view", "View"),
+        ("share", "Share"),
+    ]
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="interactions")
+    interaction_type = models.CharField(max_length=10, choices=INTERACTION_CHOICES, default="view")
+    timestamp = models.DateTimeField(auto_now_add=True)
+    user_type = models.CharField(max_length=10, default="visitor")
+    session_key = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.interaction_type} on resource {self.resource_id}"

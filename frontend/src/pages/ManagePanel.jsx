@@ -815,6 +815,193 @@ function MessagesTab() {
   );
 }
 
+// ── Analytics Tab ─────────────────────────────────────────────────────────────
+const PERIODS = [
+  { key: "today",        label: "Today" },
+  { key: "this_week",    label: "This Week" },
+  { key: "last_7_days",  label: "Last 7 Days" },
+  { key: "this_month",   label: "This Month" },
+  { key: "last_30_days", label: "Last 30 Days" },
+  { key: "three_months", label: "3 Months" },
+];
+
+function AnalyticsTab() {
+  const [period, setPeriod] = useState("last_7_days");
+  const [data, setData]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    setError("");
+    authedGet(`/api/analytics/?period=${period}`)
+      .then(setData)
+      .catch(() => setError("Failed to load analytics."))
+      .finally(() => setLoading(false));
+  }, [period]);
+
+  const maxDaily = data ? Math.max(...data.daily.map(d => d.total), 1) : 1;
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+  }
+
+  return (
+    <div className="mp-tab-content">
+      {/* Period filter */}
+      <div className="an-period-bar">
+        {PERIODS.map(p => (
+          <button
+            key={p.key}
+            className={"an-period-btn" + (period === p.key ? " active" : "")}
+            onClick={() => setPeriod(p.key)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="mp-loading">Loading analytics…</div>
+      ) : error ? (
+        <div className="mp-empty" style={{ color: "var(--accent)" }}>{error}</div>
+      ) : (
+        <>
+          {/* Summary cards */}
+          <div className="an-cards">
+            <div className="an-card">
+              <div className="an-card-value">{data.summary.total.toLocaleString()}</div>
+              <div className="an-card-label">Total Visits</div>
+            </div>
+            <div className="an-card an-card-visitor">
+              <div className="an-card-value">{data.summary.visitor.toLocaleString()}</div>
+              <div className="an-card-label">
+                <span className="an-dot an-dot-visitor" /> Visitors
+              </div>
+            </div>
+            <div className="an-card an-card-staff">
+              <div className="an-card-value">{data.summary.staff.toLocaleString()}</div>
+              <div className="an-card-label">
+                <span className="an-dot an-dot-staff" /> Staff
+              </div>
+            </div>
+            <div className="an-card an-card-sessions">
+              <div className="an-card-value">{data.summary.unique_sessions.toLocaleString()}</div>
+              <div className="an-card-label">Unique Sessions</div>
+            </div>
+          </div>
+
+          {/* Daily traffic chart */}
+          <div className="an-section">
+            <h3 className="an-section-title">Daily Traffic</h3>
+            {data.daily.length === 0 ? (
+              <div className="mp-empty">No visits recorded in this period.</div>
+            ) : (
+              <>
+                <div className="an-chart">
+                  {data.daily.map(day => {
+                    const totalH = maxDaily > 0 ? (day.total / maxDaily) * 100 : 0;
+                    const visitorPct = day.total > 0 ? (day.visitor / day.total) * 100 : 0;
+                    const staffPct   = day.total > 0 ? (day.staff   / day.total) * 100 : 0;
+                    const adminPct   = day.total > 0 ? (day.admin   / day.total) * 100 : 0;
+                    return (
+                      <div className="an-bar-col" key={day.date} title={
+                        `${fmtDate(day.date)}: ${day.total} total (${day.visitor} visitors, ${day.staff} staff, ${day.admin} admin)`
+                      }>
+                        <div className="an-bar-track">
+                          <div className="an-bar-fill" style={{ height: `${totalH}%` }}>
+                            <div className="an-seg an-seg-admin"   style={{ height: `${adminPct}%` }} />
+                            <div className="an-seg an-seg-staff"   style={{ height: `${staffPct}%` }} />
+                            <div className="an-seg an-seg-visitor" style={{ height: `${visitorPct}%` }} />
+                          </div>
+                        </div>
+                        <span className="an-bar-label">{fmtDate(day.date)}</span>
+                        <span className="an-bar-count">{day.total}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="an-legend">
+                  <span className="an-legend-item"><span className="an-dot an-dot-visitor" />Visitors</span>
+                  <span className="an-legend-item"><span className="an-dot an-dot-staff" />Staff</span>
+                  <span className="an-legend-item"><span className="an-dot an-dot-admin" />Admin</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* User type breakdown */}
+          {data.summary.total > 0 && (
+            <div className="an-section">
+              <h3 className="an-section-title">User Type Breakdown</h3>
+              <div className="an-breakdown">
+                {[
+                  { key: "visitor", label: "Visitors",  cls: "an-dot-visitor" },
+                  { key: "staff",   label: "Staff",     cls: "an-dot-staff"   },
+                  { key: "admin",   label: "Admin",     cls: "an-dot-admin"   },
+                ].map(({ key, label, cls }) => {
+                  const count = data.summary[key];
+                  const pct   = data.summary.total > 0 ? Math.round((count / data.summary.total) * 100) : 0;
+                  return (
+                    <div className="an-breakdown-row" key={key}>
+                      <span className="an-breakdown-label">
+                        <span className={`an-dot ${cls}`} />{label}
+                      </span>
+                      <div className="an-breakdown-bar-track">
+                        <div className={`an-breakdown-bar an-breakdown-bar-${key}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="an-breakdown-pct">{pct}%</span>
+                      <span className="an-breakdown-count">{count.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Top resources */}
+          <div className="an-section">
+            <h3 className="an-section-title">Most Used Resources</h3>
+            {data.top_resources.length === 0 ? (
+              <div className="mp-empty">No resource interactions recorded in this period.</div>
+            ) : (
+              <div className="an-table-wrap">
+                <table className="an-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Resource</th>
+                      <th>Project</th>
+                      <th className="an-th-num">Views</th>
+                      <th className="an-th-num">Shares</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.top_resources.map((r, i) => (
+                      <tr key={r.id}>
+                        <td className="an-rank">{i + 1}</td>
+                        <td className="an-res-name">{r.name}</td>
+                        <td className="an-res-proj">{r.project_name}</td>
+                        <td className="an-num">
+                          <span className="an-views-badge">{r.views}</span>
+                        </td>
+                        <td className="an-num">
+                          <span className="an-shares-badge">{r.shares}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ManagePanel() {
   const { user, ready } = useAuth();
@@ -846,10 +1033,11 @@ export default function ManagePanel() {
 
       <div className="mp-tabs">
         {[
-          { key:"resources", label:"Resources" },
-          { key:"projects",  label:"Projects" },
-          { key:"users",     label:"Users" },
-          { key:"messages",  label:"Messages" },
+          { key:"resources",  label:"Resources" },
+          { key:"projects",   label:"Projects" },
+          { key:"users",      label:"Users" },
+          { key:"messages",   label:"Messages" },
+          { key:"analytics",  label:"Analytics" },
         ].map(t => (
           <button
             key={t.key}
@@ -861,10 +1049,11 @@ export default function ManagePanel() {
         ))}
       </div>
 
-      {tab === "resources" && <ResourcesTab projects={projects} />}
-      {tab === "projects"  && <ProjectsTab />}
-      {tab === "users"     && <UsersTab />}
-      {tab === "messages"  && <MessagesTab />}
+      {tab === "resources"  && <ResourcesTab projects={projects} />}
+      {tab === "projects"   && <ProjectsTab />}
+      {tab === "users"      && <UsersTab />}
+      {tab === "messages"   && <MessagesTab />}
+      {tab === "analytics"  && <AnalyticsTab />}
     </main>
   );
 }

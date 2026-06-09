@@ -1,7 +1,9 @@
-import { Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { useEffect } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
+import FAQButton from "./components/FAQButton";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import AllResources from "./pages/AllResources";
@@ -11,10 +13,26 @@ import ManagePanel from "./pages/ManagePanel";
 import ChangePassword from "./pages/ChangePassword";
 import Login from "./pages/Login";
 import ResourceDetail from "./pages/ResourceDetail";
+import FAQ from "./pages/FAQ";
+import { trackVisit } from "./api";
 
-export default function App() {
+function TrackPageView() {
+  const { pathname } = useLocation();
+  const { user, ready } = useAuth();
+
+  useEffect(() => {
+    if (!ready) return;
+    const userType = !user ? "visitor" : user.role === "admin" ? "admin" : "staff";
+    trackVisit(pathname, userType);
+  }, [pathname, user, ready]);
+
+  return null;
+}
+
+function AppInner() {
   return (
-    <AuthProvider>
+    <>
+      <TrackPageView />
       <Nav />
       <Routes>
         {/* ── Public routes ── */}
@@ -23,6 +41,7 @@ export default function App() {
         <Route path="/resources/:id"   element={<ResourceDetail />} />
         <Route path="/projects/:slug"  element={<Project />} />
         <Route path="/login"           element={<Login />} />
+        <Route path="/faq"             element={<FAQ />} />
 
         {/* ── Protected routes (any authenticated user) ── */}
         <Route
@@ -56,6 +75,15 @@ export default function App() {
         <Route path="*" element={<Home />} />
       </Routes>
       <Footer />
+      <FAQButton />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
     </AuthProvider>
   );
 }

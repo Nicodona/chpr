@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import ContactMessage, Project, QuizQuestion, Resource, ResourceComment, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, StaffProfile
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -172,3 +172,10 @@ class QuizQuestionPublicSerializer(serializers.ModelSerializer):
             "option_a", "option_b", "option_c", "option_d",
             "order",
         ]
+
+
+class FAQSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FAQ
+        fields = ["id", "question", "answer", "order", "is_active", "created_at", "updated_at"]
+        read_only_fields = ["created_at", "updated_at"]

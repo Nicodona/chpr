@@ -15,15 +15,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 env = environ.Env(
     DEBUG=(bool, True),
-    ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1", "0.0.0.0"]),
-    CORS_ALLOWED_ORIGINS=(list, ["http://localhost:5173", "http://127.0.0.1:5173"]),
+    ALLOWED_HOSTS=(list, ["*"]),
+    CORS_ALLOWED_ORIGINS=(list, ["http://localhost:5173","http://192.168.1.236:5173", "http://127.0.0.1:5173"]),
 )
 # Load .env if present (does nothing if the file is missing).
 environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-key-change-me-in-production")
 DEBUG = env.bool("DEBUG")
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
+ALLOWED_HOSTS = ["*"]
 
 # The compiled React build that Django serves. Run `npm run build` in frontend/
 # and copy the produced folder into the project root as `build/`; urls.py serves
