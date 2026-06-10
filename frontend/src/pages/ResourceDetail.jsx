@@ -639,7 +639,11 @@ export default function ResourceDetail() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${BASE}/api/resources/${id}/`, { credentials: "include" });
+        const token = getToken();
+        const res = await fetch(`${BASE}/api/resources/${id}/`, {
+          headers: token ? { Authorization: `Token ${token}` } : {},
+          credentials: "include",
+        });
         if (!res.ok) throw new Error("Resource not found");
         const data = await res.json();
         setResource(data);

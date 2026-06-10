@@ -583,7 +583,11 @@ class TrackVisitView(APIView):
     Body: { page, user_type, session_key }
     """
     permission_classes = [AllowAny]
-    authentication_classes = AUTH_BACKENDS
+    # No authentication: this is a public, fire-and-forget beacon that takes
+    # user_type from the body and never reads request.user. Using
+    # SessionAuthentication here would enforce CSRF and silently reject every
+    # POST that carries a logged-in session cookie (dropping staff/admin events).
+    authentication_classes = []
 
     def post(self, request):
         SiteVisit.objects.create(
@@ -602,7 +606,9 @@ class TrackInteractionView(APIView):
     Body: { resource, interaction_type, user_type, session_key }
     """
     permission_classes = [AllowAny]
-    authentication_classes = AUTH_BACKENDS
+    # No authentication — see TrackVisitView: avoids CSRF rejecting logged-in
+    # users' beacons. user_type is supplied by the client.
+    authentication_classes = []
 
     def post(self, request):
         resource_id = request.data.get("resource")
