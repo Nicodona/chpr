@@ -26,6 +26,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source="project.name", read_only=True)
     type_label = serializers.CharField(source="get_type_key_display", read_only=True)
     activity_label = serializers.CharField(source="get_activity_display", read_only=True)
+    audience_label = serializers.CharField(source="get_audience_display", read_only=True)
     is_pool_test = serializers.BooleanField(read_only=True)
     file_url = serializers.SerializerMethodField()
 
@@ -34,6 +35,7 @@ class ResourceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "project", "project_slug", "project_name",
             "name", "type_key", "type_label", "activity", "activity_label",
+            "audience", "audience_label",
             "description", "file", "file_url",
             "test_platform", "sample_type", "pool_size", "is_pool_test",
             "posted_by", "created_at", "updated_at",
@@ -88,10 +90,15 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     """Read-only user info returned after login."""
     role = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    department_label = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "is_staff", "role"]
+        fields = [
+            "id", "username", "email", "first_name", "last_name", "is_staff",
+            "role", "department", "department_label",
+        ]
 
     def get_role(self, user):
         try:
@@ -104,6 +111,19 @@ class UserSerializer(serializers.ModelSerializer):
             return StaffProfile.Role.ADMIN
         return None
 
+    def get_department(self, user):
+        try:
+            return user.staff_profile.department or ""
+        except Exception:
+            return ""
+
+    def get_department_label(self, user):
+        try:
+            profile = user.staff_profile
+        except Exception:
+            return ""
+        return profile.get_department_display() if profile.department else ""
+
 
 class CreateUserSerializer(serializers.Serializer):
     """Validated input for admin-created accounts."""
@@ -112,6 +132,9 @@ class CreateUserSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
     last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
     role = serializers.ChoiceField(choices=StaffProfile.Role.choices, default=StaffProfile.Role.STAFF)
+    department = serializers.ChoiceField(
+        choices=StaffProfile.Department.choices, default=StaffProfile.Department.LAB
+    )
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():

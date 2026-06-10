@@ -6,6 +6,16 @@ function getToken() {
   return localStorage.getItem("chpr_token");
 }
 
+/**
+ * Headers for public GET requests that should still identify the user when
+ * logged in. The backend uses this to scope resources to the user's
+ * department; anonymous callers just get the public (audience=all) resources.
+ */
+function optionalAuthHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Token ${token}` } : {};
+}
+
 /** Read the csrftoken cookie Django sets. */
 function getCsrfCookie() {
   const match = document.cookie
@@ -92,7 +102,10 @@ export async function fetchResources(params = {}) {
   if (params.search)                                qs.set("search",   params.search);
 
   const url = `/api/resources/${qs.toString() ? `?${qs}` : ""}`;
-  const res = await fetch(`${BASE}${url}`);
+  const res = await fetch(`${BASE}${url}`, {
+    headers: optionalAuthHeaders(),
+    credentials: "include",
+  });
   if (!res.ok) throw new Error("Failed to fetch resources");
   const data = await res.json();
   return data.results ?? data;
@@ -183,7 +196,10 @@ export async function patchMessage(id, fields) {
 // ── Resource detail ───────────────────────────────────────────────────────────
 
 export async function fetchResource(id) {
-  const res = await fetch(`${BASE}/api/resources/${id}/`, { credentials: "include" });
+  const res = await fetch(`${BASE}/api/resources/${id}/`, {
+    headers: optionalAuthHeaders(),
+    credentials: "include",
+  });
   if (!res.ok) throw new Error("Resource not found");
   return res.json();
 }

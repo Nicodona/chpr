@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUser } from "../api";
+import { DEPARTMENT_OPTIONS } from "../constants";
 
 const EMPTY = {
   first_name: "",
@@ -8,6 +9,7 @@ const EMPTY = {
   email: "",
   username: "",
   role: "staff",
+  department: "lab",
 };
 
 export default function CreateUser() {
@@ -128,16 +130,32 @@ export default function CreateUser() {
             />
           </div>
 
-          <div className="field">
-            <label className="field-label">Role</label>
-            <select
-              className="field-select"
-              value={form.role}
-              onChange={(e) => set("role", e.target.value)}
-            >
-              <option value="staff">Staff — can add / edit resources</option>
-              <option value="admin">Admin — full access + create users</option>
-            </select>
+          <div className="form-row">
+            <div className="field">
+              <label className="field-label">Role</label>
+              <select
+                className="field-select"
+                value={form.role}
+                onChange={(e) => set("role", e.target.value)}
+              >
+                <option value="staff">Staff — can add / edit resources</option>
+                <option value="admin">Admin — full access + create users</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <label className="field-label">Department</label>
+              <select
+                className="field-select"
+                value={form.department}
+                onChange={(e) => set("department", e.target.value)}
+              >
+                {DEPARTMENT_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>{d.label}</option>
+                ))}
+              </select>
+              <p className="field-hint">Determines which targeted resources this user can see.</p>
+            </div>
           </div>
 
           <div className="form-actions">

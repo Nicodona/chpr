@@ -7,6 +7,7 @@ import {
   fetchProjects,
   updateResource,
 } from "../api";
+import { AUDIENCE_OPTIONS, DEPARTMENT_OPTIONS } from "../constants";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -77,6 +78,8 @@ async function authedPatch(url, body) {
 // ── Type / activity labels ──────────────────────────────────────────────────
 const TYPE_LABELS = { alg:"Algorithm", job:"Job Aid", vid:"Video", pos:"Poster", expert:"Expert Pool", trunat:"Trunat", hiv:"HIV Pool" };
 const ACT_LABELS  = { hf:"Health Facilities", hc:"Health Camps", cr:"All" };
+const AUDIENCE_LABELS   = Object.fromEntries(AUDIENCE_OPTIONS.map(o => [o.value, o.label]));
+const DEPARTMENT_LABELS = Object.fromEntries(DEPARTMENT_OPTIONS.map(o => [o.value, o.label]));
 
 // ── Stat card ───────────────────────────────────────────────────────────────
 function StatCard({ num, label, color }) {
@@ -236,7 +239,7 @@ function ResourcesTab({ projects }) {
 
   function startEdit(r) {
     setEditId(r.id);
-    setEditForm({ name: r.name, description: r.description || "", type_key: r.type_key, activity: r.activity, posted_by: r.posted_by || "", project: r.project });
+    setEditForm({ name: r.name, description: r.description || "", type_key: r.type_key, activity: r.activity, audience: r.audience || "all", posted_by: r.posted_by || "", project: r.project });
   }
 
   async function saveEdit() {
@@ -283,6 +286,7 @@ function ResourcesTab({ projects }) {
                   <div className="mp-row-meta">
                     <span className="mp-tag mp-tag-type">{TYPE_LABELS[r.type_key] || r.type_key}</span>
                     <span className="mp-tag">{ACT_LABELS[r.activity] || r.activity}</span>
+                    <span className="mp-tag">{r.audience_label || AUDIENCE_LABELS[r.audience] || "Everyone"}</span>
                     <span className="mp-tag mp-tag-project">{r.project_name}</span>
                     {r.file_url && <a href={r.file_url} target="_blank" rel="noopener" className="mp-tag mp-tag-file">View file ↗</a>}
                   </div>
@@ -334,6 +338,12 @@ function ResourcesTab({ projects }) {
                     </div>
                   </div>
                   <div className="field">
+                    <label className="field-label">Target users</label>
+                    <select className="field-select" value={editForm.audience} onChange={e => setEditForm(f => ({ ...f, audience: e.target.value }))}>
+                      {AUDIENCE_OPTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
                     <label className="field-label">Description</label>
                     <textarea className="field-textarea" rows={2} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
                   </div>
@@ -361,7 +371,7 @@ function ResourcesTab({ projects }) {
 function UsersTab() {
   const [users, setUsers]       = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [form, setForm]         = useState({ first_name:"", last_name:"", email:"", username:"", role:"staff" });
+  const [form, setForm]         = useState({ first_name:"", last_name:"", email:"", username:"", role:"staff", department:"lab" });
   const [saving, setSaving]     = useState(false);
   const [success, setSuccess]   = useState("");
   const [err, setErr]           = useState("");
@@ -384,7 +394,7 @@ function UsersTab() {
     try {
       const created = await createUser(form);
       setSuccess(`Account created for ${created.username}. Credentials sent to ${form.email}.`);
-      setForm({ first_name:"", last_name:"", email:"", username:"", role:"staff" });
+      setForm({ first_name:"", last_name:"", email:"", username:"", role:"staff", department:"lab" });
       await loadUsers();
     } catch(e) { setErr(e.message || "Failed to create user."); }
     finally { setSaving(false); }
@@ -426,6 +436,13 @@ function UsersTab() {
                 </select>
               </div>
             </div>
+            <div className="field">
+              <label className="field-label">Department</label>
+              <select className="field-select" value={form.department} onChange={e => setForm(f=>({...f,department:e.target.value}))}>
+                {DEPARTMENT_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+              <span className="field-hint">Controls which targeted resources this user sees.</span>
+            </div>
             <div style={{display:"flex",justifyContent:"flex-end",marginTop:"1rem"}}>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Creating…" : "Create account"}</button>
             </div>
@@ -445,7 +462,12 @@ function UsersTab() {
                     <span className="mp-user-name">{u.first_name || u.last_name ? `${u.first_name} ${u.last_name}`.trim() : u.username}</span>
                     <span className="mp-user-email">{u.email}</span>
                   </div>
-                  <span className={`mp-role-badge mp-role-${u.role}`}>{u.role || "staff"}</span>
+                  <div className="mp-user-tags">
+                    {u.department && (
+                      <span className="mp-tag">{u.department_label || DEPARTMENT_LABELS[u.department] || u.department}</span>
+                    )}
+                    <span className={`mp-role-badge mp-role-${u.role}`}>{u.role || "staff"}</span>
+                  </div>
                 </div>
               ))}
               {users.length === 0 && <p className="mp-empty">No users found.</p>}
@@ -721,6 +743,216 @@ function ProjectsTab() {
                         <input className="field-input" value={editForm.light_color}
                           onChange={e => setEditForm(f => ({...f, light_color: e.target.value}))} />
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FAQ tab ──────────────────────────────────────────────────────────────────
+const EMPTY_FAQ = { question: "", answer: "", order: 0, is_active: true };
+
+function FaqTab() {
+  const [faqs, setFaqs]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState(EMPTY_FAQ);
+  const [editId, setEditId]     = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving]     = useState(false);
+  const [err, setErr]           = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await authedGet("/api/faq/");
+      setFaqs(data.results ?? data);
+    } catch { setFaqs([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!createForm.question.trim() || !createForm.answer.trim()) {
+      setErr("Question and answer are required."); return;
+    }
+    setSaving(true); setErr("");
+    try {
+      await authedPost("/api/faq/", createForm);
+      setCreateForm(EMPTY_FAQ);
+      setCreating(false);
+      await load();
+    } catch (e) { setErr(e.message || "Create failed."); }
+    finally { setSaving(false); }
+  }
+
+  function startEdit(f) {
+    setEditId(f.id);
+    setEditForm({ question: f.question, answer: f.answer, order: f.order ?? 0, is_active: f.is_active });
+    setErr("");
+  }
+
+  async function saveEdit() {
+    if (!editForm.question.trim() || !editForm.answer.trim()) {
+      setErr("Question and answer are required."); return;
+    }
+    setSaving(true); setErr("");
+    try {
+      await authedPatch(`/api/faq/${editId}/`, editForm);
+      setEditId(null);
+      await load();
+    } catch (e) { setErr(e.message || "Save failed."); }
+    finally { setSaving(false); }
+  }
+
+  async function toggleActive(f) {
+    try {
+      await authedPatch(`/api/faq/${f.id}/`, { is_active: !f.is_active });
+      await load();
+    } catch (e) { alert("Update failed: " + e.message); }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Delete this FAQ? This cannot be undone.")) return;
+    try { await authedDelete(`/api/faq/${id}/`); await load(); }
+    catch (e) { alert("Delete failed: " + e.message); }
+  }
+
+  return (
+    <div className="mp-tab-content">
+      <div className="mp-toolbar">
+        <span className="mp-count">{faqs.length} FAQ{faqs.length !== 1 ? "s" : ""}</span>
+        <button
+          className="btn-primary mp-add-btn"
+          onClick={() => { setCreating(c => !c); setErr(""); setCreateForm(EMPTY_FAQ); }}
+        >
+          {creating ? "Cancel" : "+ New FAQ"}
+        </button>
+      </div>
+
+      {creating && (
+        <div className="mp-card mp-create-form">
+          <h3 className="mp-card-title">New FAQ</h3>
+          {err && <div className="field-error" style={{display:"block",marginBottom:"0.75rem"}}>{err}</div>}
+          <form onSubmit={handleCreate}>
+            <div className="field">
+              <label className="field-label">Question <span className="field-required">*</span></label>
+              <input className="field-input" value={createForm.question}
+                onChange={e => setCreateForm(f => ({...f, question: e.target.value}))}
+                placeholder="e.g. How do I reset my password?" required />
+            </div>
+            <div className="field">
+              <label className="field-label">Answer <span className="field-required">*</span></label>
+              <textarea className="field-textarea" rows={4} value={createForm.answer}
+                onChange={e => setCreateForm(f => ({...f, answer: e.target.value}))}
+                placeholder="Write the answer shown to users…" required />
+            </div>
+            <div className="field-row-2">
+              <div className="field">
+                <label className="field-label">Display order</label>
+                <input className="field-input" type="number" min={0} value={createForm.order}
+                  onChange={e => setCreateForm(f => ({...f, order: parseInt(e.target.value)||0}))} />
+                <span className="field-hint">Lower numbers appear first.</span>
+              </div>
+              <div className="field">
+                <label className="field-label">Visibility</label>
+                <label className="mp-checkbox-row">
+                  <input type="checkbox" checked={createForm.is_active}
+                    onChange={e => setCreateForm(f => ({...f, is_active: e.target.checked}))} />
+                  <span>Visible to users</span>
+                </label>
+              </div>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:"1rem",gap:"0.5rem"}}>
+              <button type="button" className="mp-btn mp-btn-cancel"
+                onClick={() => { setCreating(false); setErr(""); }}>Cancel</button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? "Creating…" : "Create FAQ"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="mp-loading">Loading FAQs…</div>
+      ) : faqs.length === 0 ? (
+        <div className="mp-empty">No FAQs yet. Create your first one above.</div>
+      ) : (
+        <div className="mp-resource-list">
+          {faqs.map(f => (
+            <div key={f.id} className={"mp-resource-row" + (editId === f.id ? " mp-row-editing" : "")}>
+              <div className="mp-row-main">
+                <div className="mp-row-info">
+                  <span className="mp-row-name">{f.question}</span>
+                  <div className="mp-row-meta">
+                    <span className="mp-tag">#{f.order}</span>
+                    <span className={`mp-tag ${f.is_active ? "mp-tag-active" : "mp-tag-inactive"}`}>
+                      {f.is_active ? "Visible" : "Hidden"}
+                    </span>
+                  </div>
+                  {f.answer && <p className="mp-faq-answer-preview">{f.answer}</p>}
+                </div>
+                <div className="mp-row-actions">
+                  {editId === f.id ? (
+                    <>
+                      <button className="mp-btn mp-btn-save" onClick={saveEdit} disabled={saving}>
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                      <button className="mp-btn mp-btn-cancel" onClick={() => { setEditId(null); setErr(""); }}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className={`mp-btn ${f.is_active ? "mp-btn-delete" : "mp-btn-save"}`}
+                        onClick={() => toggleActive(f)}
+                        title={f.is_active ? "Hide from site" : "Show on site"}
+                      >
+                        {f.is_active ? "Hide" : "Show"}
+                      </button>
+                      <button className="mp-btn mp-btn-edit" onClick={() => startEdit(f)}>Edit</button>
+                      <button className="mp-btn mp-btn-delete" onClick={() => handleDelete(f.id)}>Delete</button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {editId === f.id && (
+                <div className="mp-edit-form">
+                  {err && <div className="field-error" style={{display:"block",marginBottom:"0.5rem"}}>{err}</div>}
+                  <div className="field">
+                    <label className="field-label">Question</label>
+                    <input className="field-input" value={editForm.question}
+                      onChange={e => setEditForm(f => ({...f, question: e.target.value}))} />
+                  </div>
+                  <div className="field">
+                    <label className="field-label">Answer</label>
+                    <textarea className="field-textarea" rows={4} value={editForm.answer}
+                      onChange={e => setEditForm(f => ({...f, answer: e.target.value}))} />
+                  </div>
+                  <div className="field-row-2">
+                    <div className="field">
+                      <label className="field-label">Display order</label>
+                      <input className="field-input" type="number" min={0} value={editForm.order}
+                        onChange={e => setEditForm(f => ({...f, order: parseInt(e.target.value)||0}))} />
+                    </div>
+                    <div className="field">
+                      <label className="field-label">Visibility</label>
+                      <label className="mp-checkbox-row">
+                        <input type="checkbox" checked={editForm.is_active}
+                          onChange={e => setEditForm(f => ({...f, is_active: e.target.checked}))} />
+                        <span>Visible to users</span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -1036,6 +1268,7 @@ export default function ManagePanel() {
           { key:"resources",  label:"Resources" },
           { key:"projects",   label:"Projects" },
           { key:"users",      label:"Users" },
+          { key:"faq",        label:"FAQ" },
           { key:"messages",   label:"Messages" },
           { key:"analytics",  label:"Analytics" },
         ].map(t => (
@@ -1052,6 +1285,7 @@ export default function ManagePanel() {
       {tab === "resources"  && <ResourcesTab projects={projects} />}
       {tab === "projects"   && <ProjectsTab />}
       {tab === "users"      && <UsersTab />}
+      {tab === "faq"        && <FaqTab />}
       {tab === "messages"   && <MessagesTab />}
       {tab === "analytics"  && <AnalyticsTab />}
     </main>

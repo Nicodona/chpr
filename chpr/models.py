@@ -26,8 +26,18 @@ class StaffProfile(models.Model):
         ADMIN = "admin", "Admin"       # full CRUD + Django admin access
         STAFF = "staff", "Staff"       # CRUD on resources only
 
+    class Department(models.TextChoices):
+        LAB = "lab", "Lab"
+        DATA = "data", "Data Team"
+        ADMIN = "admin", "Admin"
+        VOLUNTEER = "volunteer", "Volunteer"
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="staff_profile")
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.STAFF)
+    department = models.CharField(
+        max_length=20, choices=Department.choices, blank=True, default="",
+        help_text="Which team the user belongs to. Controls which targeted resources they see.",
+    )
 
     def __str__(self):
         return f"{self.user.username} ({self.get_role_display()})"
@@ -86,6 +96,14 @@ class Resource(models.Model):
         HEALTH_CAMP = "hc", "Health Camps"
         CROSS = "cr", "All"
 
+    class Audience(models.TextChoices):
+        ALL = "all", "Everyone (public)"
+        ALL_STAFF = "staff", "All Staff"
+        LAB = "lab", "Lab only"
+        DATA = "data", "Data Team only"
+        ADMIN = "admin", "Admin only"
+        VOLUNTEER = "volunteer", "Volunteer only"
+
     # Pool-testing type keys, used for filtering "Pool Tests" together.
     POOL_TYPES = (Type.EXPERT_POOL, Type.TRUNAT, Type.HIV_POOL)
 
@@ -93,6 +111,10 @@ class Resource(models.Model):
     name = models.CharField(max_length=255)
     type_key = models.CharField(max_length=20, choices=Type.choices, default=Type.JOB_AID)
     activity = models.CharField(max_length=2, choices=Activity.choices, default=Activity.HEALTH_FACILITY)
+    audience = models.CharField(
+        max_length=20, choices=Audience.choices, default=Audience.ALL,
+        help_text="Who this resource is shown to. 'Everyone' is public; the rest require a matching department.",
+    )
     description = models.TextField(blank=True)
 
     # ---- Upload ----

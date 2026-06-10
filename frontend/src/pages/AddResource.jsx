@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchProjects, createResource } from "../api";
-import { TYPE_LABELS, POOL_TYPES } from "../constants";
+import { TYPE_LABELS, POOL_TYPES, AUDIENCE_OPTIONS } from "../constants";
 
 const ACTIVITY_OPTIONS = [
   { value: "hf", label: "Health Facilities" },
@@ -15,6 +15,7 @@ const EMPTY = {
   name: "",
   type_key: "job",
   activity: "hf",
+  audience: "all",
   description: "",
   posted_by: "",
   test_platform: "",
@@ -57,6 +58,7 @@ export default function AddResource() {
       name: form.name.trim(),
       type_key: form.type_key,
       activity: form.activity,
+      audience: form.audience,
       description: form.description.trim(),
       posted_by: form.posted_by.trim(),
       file,
@@ -71,7 +73,7 @@ export default function AddResource() {
     try {
       const created = await createResource(fields);
       setSuccess(`“${created.name}” was added.`);
-      setForm({ ...EMPTY, project: form.project, type_key: form.type_key });
+      setForm({ ...EMPTY, project: form.project, type_key: form.type_key, audience: form.audience });
       setFile(null);
       if (fileInput.current) fileInput.current.value = "";
     } catch (err) {
@@ -161,6 +163,22 @@ export default function AddResource() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="field">
+            <label className="field-label">Target users</label>
+            <select
+              className="field-select"
+              value={form.audience}
+              onChange={(e) => set("audience", e.target.value)}
+            >
+              {AUDIENCE_OPTIONS.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
+            </select>
+            <p className="field-hint">
+              Who can see this resource. “Everyone” is public; the rest are shown only to staff in the matching department (admins always see all).
+            </p>
           </div>
 
           <div className="field">

@@ -2972,6 +2972,37 @@ body {
 .mp-role-admin { background: rgba(0,84,166,0.09);  color: var(--primary); border: 1px solid rgba(0,84,166,0.2); }
 .mp-role-staff { background: rgba(15,110,86,0.08); color: var(--teal);    border: 1px solid rgba(15,110,86,0.2); }
 
+.mp-user-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+/* FAQ tab */
+.mp-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--dark);
+  cursor: pointer;
+  padding-top: 0.45rem;
+}
+
+.mp-checkbox-row input { width: 16px; height: 16px; cursor: pointer; }
+
+.mp-faq-answer-preview {
+  margin: 0.4rem 0 0;
+  font-size: 0.83rem;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* Messages filter tabs */
 .mp-filter-tabs {
   display: flex;

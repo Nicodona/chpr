@@ -53,6 +53,14 @@ def _is_admin(user):
         return False
 
 
+def _user_department(user):
+    """Return the user's StaffProfile department key, or '' if none."""
+    try:
+        return user.staff_profile.department or ""
+    except Exception:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # Auth views
 # ---------------------------------------------------------------------------
@@ -174,6 +182,20 @@ class ResourceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
+
+        # ---- Audience visibility ----
+        # Admins/superusers see everything (so they can manage). Other users
+        # see public resources, all-staff resources, and resources targeted at
+        # their own department. Anonymous visitors see only public resources.
+        user = self.request.user
+        if not (user.is_authenticated and _is_admin(user)):
+            visible = Q(audience=Resource.Audience.ALL)
+            if user.is_authenticated:
+                visible |= Q(audience=Resource.Audience.ALL_STAFF)
+                dept = _user_department(user)
+                if dept:
+                    visible |= Q(audience=dept)
+            qs = qs.filter(visible)
 
         project = params.get("project")
         if project:
@@ -354,7 +376,9 @@ class CreateUserView(APIView):
             first_name=d.get("first_name", ""),
             last_name=d.get("last_name", ""),
         )
-        StaffProfile.objects.create(user=user, role=d["role"])
+        StaffProfile.objects.create(
+            user=user, role=d["role"], department=d.get("department", ""),
+        )
 
         site_url = getattr(django_settings, "SITE_URL", "")
         full_name = user.get_full_name() or user.username

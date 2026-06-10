@@ -1,7 +1,16 @@
 """Django admin registrations for the CHPR Resources Hub."""
 from django.contrib import admin
 
-from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceInteraction, SiteVisit
+from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceInteraction, SiteVisit, StaffProfile
+
+
+@admin.register(StaffProfile)
+class StaffProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "role", "department")
+    list_filter = ("role", "department")
+    list_editable = ("role", "department")
+    search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")
+    autocomplete_fields = ("user",)
 
 
 class ResourceInline(admin.TabularInline):
@@ -23,13 +32,13 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(Resource)
 class ResourceAdmin(admin.ModelAdmin):
-    list_display = ("name", "project", "type_key", "activity", "is_pool_test", "created_at")
-    list_filter = ("type_key", "activity", "project")
+    list_display = ("name", "project", "type_key", "activity", "audience", "is_pool_test", "created_at")
+    list_filter = ("type_key", "activity", "audience", "project")
     search_fields = ("name", "description", "posted_by")
     autocomplete_fields = ("project",)
     readonly_fields = ("created_at", "updated_at")
     fieldsets = (
-        (None, {"fields": ("project", "name", "type_key", "activity", "description", "file")}),
+        (None, {"fields": ("project", "name", "type_key", "activity", "audience", "description", "file")}),
         ("Pool testing", {
             "classes": ("collapse",),
             "fields": ("test_platform", "sample_type", "pool_size"),
