@@ -1,0 +1,50 @@
+# CHPR Resources Hub — production stack for the shared CHPR droplet.
+#
+# Mirrors the Corynth SMS / Equipment Tracker pattern:
+#   - gunicorn web container + Postgres, both host-ports bound to 127.0.0.1
+#     ONLY (never 0.0.0.0) so nothing is publicly reachable except through
+#     the Apache vhost on 127.0.0.1:4443.
+#   - Postgres data lives in a NAMED volume (survives container recreation;
+#     never prune — see SERVER_HANDOVER §4.3).
+#   - media is a BIND mount to /opt/chpr/media so Apache can serve uploaded
+#     PDFs/videos directly (efficient) via an Alias, bypassing gunicorn.
+#
+# Host ports (confirmed free on the droplet 2026-06-13):
+#   8300  -> web (gunicorn)   [127.0.0.1 only]
+#   55434 -> postgres          [127.0.0.1 only]
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    # Single env file at the compose root (/opt/chpr/.env) — docker compose
+    # also reads it for the ${POSTGRES_*} interpolation below, so there's
+    # one source of truth. Template: deploy/.env.example.
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Uploaded media on the host so Apache's Alias can serve it.
+      - ./media:/app/media
+    ports:
+      - "127.0.0.1:8300:8000"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chpr_hub}
+      POSTGRES_USER: ${POSTGRES_USER:-chpr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - chpr_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:55434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chpr} -d ${POSTGRES_DB:-chpr_hub}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  chpr_postgres_data:

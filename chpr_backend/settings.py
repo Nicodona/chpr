@@ -203,3 +203,29 @@ DEFAULT_FROM_EMAIL = env(
 
 # Public URL for links inside emails (no trailing slash).
 SITE_URL = env("SITE_URL", default="http://localhost:5173")
+
+
+# ---------------------------------------------------------------------------
+# Production hardening (behind the Apache reverse proxy on the shared droplet)
+# ---------------------------------------------------------------------------
+# All opt-in via env so local dev is unaffected. Set these in the production
+# .env (see deploy/.env.example):
+#   BEHIND_TLS_PROXY=True
+#   CSRF_TRUSTED_ORIGINS=https://chpr-resource.org,https://www.chpr-resource.org
+#
+# Why each is needed when Apache terminates TLS and proxies to gunicorn:
+#   - SECURE_PROXY_SSL_HEADER: Apache sets `X-Forwarded-Proto: https`; without
+#     this Django thinks the request is plain HTTP and (a) marks secure cookies
+#     unsendable and (b) builds http:// absolute URLs.
+#   - CSRF_TRUSTED_ORIGINS: Django 4+ checks the Origin/Referer against this
+#     list on any unsafe (POST/PUT/DELETE) request over HTTPS. The SPA's
+#     session-auth login POST and the /admin/ login both fail with
+#     "CSRF verification failed" without the site's https origin listed.
+#   - Secure cookies: the session + CSRF cookies must only travel over HTTPS.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
+if env.bool("BEHIND_TLS_PROXY", default=False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
