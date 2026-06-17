@@ -21,7 +21,30 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProjectPKOrSlugField(serializers.PrimaryKeyRelatedField):
+    """Relate a Resource to its Project by **either** primary key or slug.
+
+    On read it behaves exactly like a normal PrimaryKeyRelatedField (returns the
+    project's id), so existing clients that expect a numeric ``project`` are
+    unaffected. On write it additionally accepts the project *slug*
+    (e.g. ``"breathe"``) — this makes the endpoint tolerant of older/cached
+    frontend bundles and the legacy app, which identified projects by slug and
+    otherwise triggered "Incorrect type. Expected pk value, received str."
+    """
+
+    def to_internal_value(self, data):
+        # A non-numeric string is treated as a slug; everything else (ints,
+        # numeric strings) falls through to the normal pk handling.
+        if isinstance(data, str) and not data.isdigit():
+            try:
+                return self.get_queryset().get(slug=data)
+            except Project.DoesNotExist:
+                self.fail("does_not_exist", pk_value=data)
+        return super().to_internal_value(data)
+
+
 class ResourceSerializer(serializers.ModelSerializer):
+    project = ProjectPKOrSlugField(queryset=Project.objects.all())
     project_slug = serializers.SlugField(source="project.slug", read_only=True)
     project_name = serializers.CharField(source="project.name", read_only=True)
     type_label = serializers.CharField(source="get_type_key_display", read_only=True)
