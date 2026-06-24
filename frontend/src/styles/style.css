@@ -4562,8 +4562,14 @@ body { background: var(--page-bg); }
 .nav-logo-mark { background: #fff; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
 .nav-logo-text { color: #fff; }
 .nav-logo-text span { color: rgba(255,255,255,0.72); }
-.nav-link { color: rgba(255,255,255,0.88); }
-.nav-link:hover, .nav-link.active { color: #fff; background: rgba(255,255,255,0.16); }
+.nav-link {
+  color: #fff; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.40);
+  border-radius: 8px; padding: 7px 16px;
+}
+.nav-link:hover, .nav-link.active {
+  color: #fff; background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.75);
+}
 .nav-search { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.30); }
 .nav-search input { color: #fff; }
 .nav-search input::placeholder { color: rgba(255,255,255,0.72); }
@@ -4591,6 +4597,12 @@ body { background: var(--page-bg); }
 .hero-anim-title-accent { color: #ff6172; }
 .hero-search-btn { background: var(--brand-grad); }
 .hero-search-btn:hover { background: var(--brand-grad-hover); }
+/* Hero quick-link tiles read as defined, bordered buttons */
+.hero-tile-mark {
+  border: 2px solid var(--tile-color, #fff);
+  background: #fff;
+}
+.hero-tile-label { color: rgba(255,255,255,0.92); font-weight: 600; }
 
 /* ── Section headers: bolder navy title with a red accent underline ─────── */
 .section-eyebrow { color: var(--accent-red); }
@@ -4630,3 +4642,30 @@ body { background: var(--page-bg); }
 
 /* ── Pagination active uses the brand gradient ──────────────────────────── */
 .page-btn-active { background: var(--brand-grad); border-color: var(--primary); }
+
+/* ── Mobile tap targets: comfortable touch areas for header/detail links ── */
+@media (max-width: 640px) {
+  .back-link, .rd-back, .rd-share-btn, .rd-project-link {
+    min-height: 40px; display: inline-flex; align-items: center;
+  }
+  .rd-openfile-link { min-height: 38px; display: inline-flex; align-items: center; }
+  .nav-logo { min-height: 44px; display: inline-flex; align-items: center; }
+
+  /* Filters: one tidy swipeable row instead of a ragged multi-line wrap */
+  .filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;            /* Firefox */
+    scroll-snap-type: x proximity;
+    padding-bottom: 6px;
+    /* fade the right edge to hint there's more to swipe */
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent);
+            mask-image: linear-gradient(to right, #000 88%, transparent);
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }   /* Chrome / Safari */
+  .filter-bar > .filter-btn,
+  .filter-bar > .filter-label { flex: 0 0 auto; scroll-snap-align: start; }
+  .filter-btn { min-height: 40px; }
+}

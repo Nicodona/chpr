@@ -15,28 +15,6 @@ const PUBLIC_TILES = [
 ];
 const ADMIN_TILE = { to:"/manage", mark:"Mg", label:"Admin Panel", color:"#0f172a", bg:"#334155", isAdmin:true };
 
-// TB education info-cards — monogram + title + description; duplicated in JSX for seamless loop
-const TICKER_TOP = [
-  { icon:"CC", title:"Cover your cough",     desc:"Use your inner elbow to block respiratory droplets from spreading." },
-  { icon:"WM", title:"Wear a mask",           desc:"Essential in crowded or poorly ventilated indoor spaces." },
-  { icon:"IV", title:"Improve ventilation",   desc:"Open windows and doors — fresh air dilutes airborne TB bacteria." },
-  { icon:"SC", title:"Sputum collection",     desc:"Collect early morning on an empty stomach for the best sample." },
-  { icon:"CT", title:"Complete treatment",    desc:"Never stop TB medication early — it prevents dangerous resistance." },
-  { icon:"IW", title:"Isolate when ill",      desc:"Stay home and wear a mask until you are no longer infectious." },
-  { icon:"KS", title:"Know the symptoms",     desc:"Persistent cough, night sweats, fever, unexplained weight loss." },
-  { icon:"KY", title:"Know your status",      desc:"Early testing leads to early treatment and full recovery." },
-];
-const TICKER_BOTTOM = [
-  { icon:"ED", title:"Early diagnosis",       desc:"Getting tested quickly saves lives — TB is curable when caught early." },
-  { icon:"BG", title:"BCG vaccination",       desc:"Protects infants and children against severe forms of tuberculosis." },
-  { icon:"FP", title:"Follow your plan",      desc:"Take every prescribed dose daily — consistency is the key to cure." },
-  { icon:"NM", title:"Nutrition matters",     desc:"A healthy, balanced diet helps your immune system fight TB faster." },
-  { icon:"SC", title:"See a clinician",       desc:"Don't wait — consult a healthcare worker for any cough over 2 weeks." },
-  { icon:"TC", title:"TB is curable",         desc:"With proper treatment 95% of TB patients make a full recovery." },
-  { icon:"GX", title:"GeneXpert testing",     desc:"Rapid molecular test detects TB and drug resistance in under 2 hours." },
-  { icon:"ET", title:"End TB together",       desc:"Community awareness and action are the key to eliminating tuberculosis." },
-];
-
 export default function Home() {
   const { user }        = useAuth();
   const [projects, setProjects]   = useState([]);
@@ -68,25 +46,6 @@ export default function Home() {
     <>
       {/* ── Hero ── */}
       <section className="hero-anim" aria-label="CHPR Resources Hub">
-
-        {/* Background — slow continuous scroll along the bottom */}
-        <div className="hero-bg-anim" aria-hidden="true">
-          <div className="hero-ticker">
-            <div className="hero-ticker-track">
-              {[...TICKER_BOTTOM, ...TICKER_BOTTOM].map((item, i) => (
-                <div key={i} className="htic-card">
-                  <div className="htic-icon-wrap">
-                    <span className="htic-monogram">{item.icon}</span>
-                  </div>
-                  <div className="htic-info">
-                    <div className="htic-title">{item.title}</div>
-                    <div className="htic-desc">{item.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {/* Foreground — centered content */}
         <div className="hero-fg">

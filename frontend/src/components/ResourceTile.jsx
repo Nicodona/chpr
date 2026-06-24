@@ -22,16 +22,16 @@ function getPdfJs() {
   return _pdfJsPromise;
 }
 
-function isPdf(url) {
+export function isPdf(url) {
   if (!url) return false;
   return url.split("?")[0].toLowerCase().endsWith(".pdf");
 }
 
-const LANG_SHORT = { en: "EN", fr: "FR", pcm: "Pidgin", ful: "Fulfulde" };
+export const LANG_SHORT = { en: "EN", fr: "FR", pcm: "Pidgin", ful: "Fulfulde" };
 
 // Pick the URL to thumbnail/preview: prefer English, else first language file,
 // else the legacy single file_url.
-function primaryUrl(resource) {
+export function primaryUrl(resource) {
   const langs = resource.languages || [];
   const en = langs.find((l) => l.language === "en");
   return (en && en.url) || (langs[0] && langs[0].url) || resource.file_url || null;
