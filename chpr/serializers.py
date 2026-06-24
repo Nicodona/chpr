@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, StaffProfile
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -43,6 +43,22 @@ class ProjectPKOrSlugField(serializers.PrimaryKeyRelatedField):
         return super().to_internal_value(data)
 
 
+class ResourceFileSerializer(serializers.ModelSerializer):
+    """One language file of a resource (for the frontend language switcher)."""
+    language_label = serializers.CharField(source="get_language_display", read_only=True)
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ResourceFile
+        fields = ["id", "language", "language_label", "url"]
+
+    def get_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+
+
 class ResourceSerializer(serializers.ModelSerializer):
     project = ProjectPKOrSlugField(queryset=Project.objects.all())
     project_slug = serializers.SlugField(source="project.slug", read_only=True)
@@ -52,6 +68,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     audience_label = serializers.CharField(source="get_audience_display", read_only=True)
     is_pool_test = serializers.BooleanField(read_only=True)
     file_url = serializers.SerializerMethodField()
+    languages = ResourceFileSerializer(source="files", many=True, read_only=True)
 
     class Meta:
         model = Resource
@@ -59,7 +76,7 @@ class ResourceSerializer(serializers.ModelSerializer):
             "id", "project", "project_slug", "project_name",
             "name", "type_key", "type_label", "activity", "activity_label",
             "audience", "audience_label",
-            "description", "file", "file_url",
+            "description", "file", "file_url", "languages",
             "test_platform", "sample_type", "pool_size", "is_pool_test",
             "posted_by", "created_at", "updated_at",
         ]

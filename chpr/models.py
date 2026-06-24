@@ -154,6 +154,35 @@ class Resource(models.Model):
         return self.get_type_key_display()
 
 
+class ResourceFile(models.Model):
+    """A language-specific file for a Resource (EN / FR / Pidgin / Fulfulde).
+
+    A resource can offer the same material in several languages; the frontend
+    shows a language switcher and serves the matching file. Resources with a
+    single language simply have one ResourceFile. The legacy ``Resource.file``
+    is kept for backward compatibility; new uploads go here.
+    """
+
+    class Language(models.TextChoices):
+        ENGLISH = "en", "English"
+        FRENCH = "fr", "French"
+        PIDGIN = "pcm", "Pidgin"
+        FULFULDE = "ful", "Fulfulde"
+
+    resource = models.ForeignKey(Resource, related_name="files", on_delete=models.CASCADE)
+    language = models.CharField(max_length=5, choices=Language.choices, default=Language.ENGLISH)
+    file = models.FileField(upload_to="resources/%Y/%m/")
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        unique_together = [("resource", "language")]
+
+    def __str__(self):
+        return f"{self.resource_id} [{self.language}]"
+
+
 class ResourceComment(models.Model):
     """A staff comment on a resource (open thread in the mockup)."""
 

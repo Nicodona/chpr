@@ -174,7 +174,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
       ?activity=<hf|hc>   filter by setting
       ?search=<text>      match name / description / project name
     """
-    queryset = Resource.objects.select_related("project").all()
+    queryset = Resource.objects.select_related("project").prefetch_related("files").all()
     serializer_class = ResourceSerializer
     authentication_classes = AUTH_BACKENDS
     permission_classes = [IsAuthenticatedOrReadOnly]

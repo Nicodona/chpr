@@ -1,7 +1,7 @@
 """Django admin registrations for the CHPR Resources Hub."""
 from django.contrib import admin
 
-from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceInteraction, SiteVisit, StaffProfile
+from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceFile, ResourceInteraction, SiteVisit, StaffProfile
 
 
 @admin.register(StaffProfile)
@@ -30,8 +30,15 @@ class ProjectAdmin(admin.ModelAdmin):
     inlines = [ResourceInline]
 
 
+class ResourceFileInline(admin.TabularInline):
+    model = ResourceFile
+    extra = 1
+    fields = ("language", "file", "order")
+
+
 @admin.register(Resource)
 class ResourceAdmin(admin.ModelAdmin):
+    inlines = [ResourceFileInline]
     list_display = ("name", "project", "type_key", "activity", "audience", "is_pool_test", "created_at")
     list_filter = ("type_key", "activity", "audience", "project")
     search_fields = ("name", "description", "posted_by")
