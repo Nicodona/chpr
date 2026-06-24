@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchProject, fetchResources } from "../api";
 import { TYPE_FILTERS } from "../constants";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
+import Pagination from "../components/Pagination";
 
 const PAGE_SIZE = 12;
 
@@ -15,7 +16,8 @@ export default function Project() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [type, setType] = useState("all");
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [page, setPage] = useState(1);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     fetchProject(slug)
@@ -27,7 +29,7 @@ export default function Project() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    setVisible(PAGE_SIZE);
+    setPage(1);
     fetchResources({ project: slug, type })
       .then((data) => { if (!cancelled) setResources(data); })
       .catch(() => { if (!cancelled) setError("Couldn't load resources. Please try again."); })
@@ -53,7 +55,12 @@ export default function Project() {
     );
   }
 
-  const shown = resources.slice(0, visible);
+  const pageCount = Math.ceil(resources.length / PAGE_SIZE);
+  const shown = resources.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  function goToPage(p) {
+    setPage(p);
+    if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <main className="main">
@@ -78,7 +85,7 @@ export default function Project() {
 
       <Filters label="Filter by type:" options={TYPE_FILTERS} value={type} onChange={setType} />
 
-      <div className="resource-panel">
+      <div className="resource-panel" ref={panelRef}>
         <div className="resource-panel-header">
           <h3>{project.name} Resources</h3>
           {!loading && !error && (
@@ -109,13 +116,7 @@ export default function Project() {
                 <ResourceTile key={r.id} resource={r} showProject={false} />
               ))}
             </div>
-            {visible < resources.length && (
-              <div className="load-more-wrap">
-                <button className="btn-load-more" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                  Load more ({resources.length - visible} more)
-                </button>
-              </div>
-            )}
+            <Pagination page={page} pageCount={pageCount} onChange={goToPage} />
           </>
         )}
       </div>

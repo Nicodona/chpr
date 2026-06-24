@@ -4502,14 +4502,34 @@ body {
 .rd-openfile-link { font-size: 0.875rem; font-weight: 600; color: var(--primary, #0054A6); text-decoration: none; }
 .rd-openfile-link:hover { text-decoration: underline; }
 
-/* ── Loading skeletons + "Load more" pagination ─────────────────────────── */
-.load-more-wrap { display: flex; justify-content: center; margin-top: 1.5rem; }
-.btn-load-more {
-  min-height: 44px; padding: 10px 24px; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--primary, #0054A6); background: #fff;
-  color: var(--primary, #0054A6); font-size: 0.9rem; font-weight: 700;
+/* ── Numbered pagination ────────────────────────────────────────────────── */
+.pagination {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 6px; margin-top: 1.75rem;
 }
-.btn-load-more:hover { background: var(--light, #e6f1fb); }
+.page-btn {
+  min-width: 40px; height: 40px; padding: 0 10px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border, #d8e0ea); background: #fff;
+  color: var(--text, #1f2a3a); font-size: 0.9rem; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.page-btn:hover:not(:disabled):not(.page-btn-active) {
+  background: var(--light, #e6f1fb); border-color: var(--primary, #0054A6);
+}
+.page-btn-active {
+  background: var(--primary, #0054A6); border-color: var(--primary, #0054A6);
+  color: #fff; cursor: default;
+}
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.page-nav { font-size: 1.15rem; line-height: 1; }
+.page-ellipsis {
+  min-width: 28px; text-align: center; color: var(--muted, #6b7686);
+  font-weight: 700; user-select: none;
+}
+.page-btn:focus-visible { outline: 2px solid var(--primary, #0054A6); outline-offset: 2px; }
+
+/* ── Loading skeletons ──────────────────────────────────────────────────── */
 .tile-skeleton { pointer-events: none; }
 .tile-thumb-skel { background: linear-gradient(90deg,#eef2f7 25%,#e2e8f0 37%,#eef2f7 63%); background-size: 400% 100%; animation: skelShimmer 1.4s ease infinite; min-height: 150px; border-radius: 8px; }
 .skel-line { height: 12px; border-radius: 6px; margin: 8px 0; background: linear-gradient(90deg,#eef2f7 25%,#e2e8f0 37%,#eef2f7 63%); background-size: 400% 100%; animation: skelShimmer 1.4s ease infinite; }

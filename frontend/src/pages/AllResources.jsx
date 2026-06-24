@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { fetchProjects, fetchResources } from "../api";
 import { TYPE_FILTERS } from "../constants";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
+import Pagination from "../components/Pagination";
 
 const PAGE_SIZE = 12;
 
@@ -13,7 +14,7 @@ export default function AllResources() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [page, setPage] = useState(1);
 
   const type = searchParams.get("type") || "all";
   const project = searchParams.get("project") || "all";
@@ -32,7 +33,7 @@ export default function AllResources() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    setVisible(PAGE_SIZE);
+    setPage(1);
     fetchResources({ type, project, search })
       .then((data) => { if (!cancelled) setResources(data); })
       .catch(() => { if (!cancelled) setError("Couldn't load resources. Please check your connection and try again."); })
@@ -47,7 +48,13 @@ export default function AllResources() {
     setSearchParams(next);
   }
 
-  const shown = resources.slice(0, visible);
+  const pageCount = Math.ceil(resources.length / PAGE_SIZE);
+  const shown = resources.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const panelRef = useRef(null);
+  function goToPage(p) {
+    setPage(p);
+    if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <main className="main">
@@ -60,7 +67,7 @@ export default function AllResources() {
       <Filters options={TYPE_FILTERS} value={type} onChange={(v) => setParam("type", v)} />
       <Filters options={projectFilters} value={project} onChange={(v) => setParam("project", v)} />
 
-      <div className="resource-panel">
+      <div className="resource-panel" ref={panelRef}>
         <div className="resource-panel-header">
           <h3>{search ? `Results for “${search}”` : "All Resources"}</h3>
           {!loading && !error && (
@@ -95,13 +102,7 @@ export default function AllResources() {
                 <ResourceTile key={r.id} resource={r} />
               ))}
             </div>
-            {visible < resources.length && (
-              <div className="load-more-wrap">
-                <button className="btn-load-more" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                  Load more ({resources.length - visible} more)
-                </button>
-              </div>
-            )}
+            <Pagination page={page} pageCount={pageCount} onChange={goToPage} />
           </>
         )}
       </div>
