@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchProjects, fetchResources } from "../api";
-import { TYPE_FILTERS } from "../constants";
+import { availableTypeFilters, filterByType, hasPoolResources } from "../filters";
 import { useAuth } from "../context/AuthContext";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
@@ -25,22 +25,29 @@ export default function Home() {
   const [q, setQ]                 = useState("");
   const navigate                  = useNavigate();
 
-  const tiles = useMemo(
-    () => user?.role === "admin" ? [...PUBLIC_TILES, ADMIN_TILE] : PUBLIC_TILES,
-    [user],
-  );
+  // Hide the "Pool Tests" quick link until pool resources actually exist.
+  const tiles = useMemo(() => {
+    const base = hasPoolResources(resources)
+      ? PUBLIC_TILES
+      : PUBLIC_TILES.filter((t) => t.label !== "Pool Tests");
+    return user?.role === "admin" ? [...base, ADMIN_TILE] : base;
+  }, [user, resources]);
 
   useEffect(() => { fetchProjects().then(setProjects).catch(console.error); }, []);
+  // Fetch everything once; type pills + filtering are derived client-side.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    fetchResources(type === "pool" ? { type:"pool" } : { type })
+    fetchResources({})
       .then((data) => { if (!cancelled) setResources(data); })
       .catch(() => { if (!cancelled) setError("Couldn't load resources. Please try again."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [type]);
+  }, []);
+
+  const typeFilters = useMemo(() => availableTypeFilters(resources), [resources]);
+  const filtered = useMemo(() => filterByType(resources, type), [resources, type]);
 
   return (
     <>
@@ -132,13 +139,13 @@ export default function Home() {
           <Link to="/resources" className="section-link">See all →</Link>
         </div>
 
-        <Filters label="Filter:" options={TYPE_FILTERS} value={type} onChange={setType} />
+        <Filters label="Filter:" options={typeFilters} value={type} onChange={setType} />
 
         <div className="resource-panel">
           <div className="resource-panel-header">
             <h3>All resources</h3>
             {!loading && !error && (
-              <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
+              <span>{filtered.length} resource{filtered.length !== 1 ? "s" : ""}</span>
             )}
           </div>
           {loading ? (
@@ -156,11 +163,11 @@ export default function Home() {
             </div>
           ) : error ? (
             <div className="empty-state"><p>{error}</p></div>
-          ) : resources.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="empty-state"><p>No resources found.</p></div>
           ) : (
             <div className="resources-grid">
-              {resources.slice(0, 8).map(r => (
+              {filtered.slice(0, 8).map(r => (
                 <ResourceTile key={r.id} resource={r} />
               ))}
             </div>

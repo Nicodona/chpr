@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchProject, fetchResources } from "../api";
-import { TYPE_FILTERS } from "../constants";
+import { availableTypeFilters, filterByType } from "../filters";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 import Pagination from "../components/Pagination";
@@ -25,17 +25,20 @@ export default function Project() {
       .catch(() => setProjectError("Couldn't load this project."));
   }, [slug]);
 
+  // Fetch the project's resources once (no type filter); type pills + filtering
+  // are derived client-side so empty types never show and switching is instant.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    setPage(1);
-    fetchResources({ project: slug, type })
+    fetchResources({ project: slug })
       .then((data) => { if (!cancelled) setResources(data); })
       .catch(() => { if (!cancelled) setError("Couldn't load resources. Please try again."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [slug, type]);
+  }, [slug]);
+
+  useEffect(() => { setPage(1); }, [type]);
 
   if (projectError) {
     return (
@@ -55,8 +58,10 @@ export default function Project() {
     );
   }
 
-  const pageCount = Math.ceil(resources.length / PAGE_SIZE);
-  const shown = resources.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const typeFilters = useMemo(() => availableTypeFilters(resources), [resources]);
+  const filtered = useMemo(() => filterByType(resources, type), [resources, type]);
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
+  const shown = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   function goToPage(p) {
     setPage(p);
     if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -83,13 +88,13 @@ export default function Project() {
         <h2 className="section-title">Resources</h2>
       </div>
 
-      <Filters label="Filter by type:" options={TYPE_FILTERS} value={type} onChange={setType} />
+      <Filters label="Filter by type:" options={typeFilters} value={type} onChange={setType} />
 
       <div className="resource-panel" ref={panelRef}>
         <div className="resource-panel-header">
           <h3>{project.name} Resources</h3>
           {!loading && !error && (
-            <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
+            <span>{filtered.length} resource{filtered.length !== 1 ? "s" : ""}</span>
           )}
         </div>
         {loading ? (

@@ -4597,12 +4597,27 @@ body { background: var(--page-bg); }
 .hero-anim-title-accent { color: #ff6172; }
 .hero-search-btn { background: var(--brand-grad); }
 .hero-search-btn:hover { background: var(--brand-grad-hover); }
-/* Hero quick-link tiles read as defined, bordered buttons */
-.hero-tile-mark {
-  border: 2px solid var(--tile-color, #fff);
-  background: #fff;
+/* Hero quick-link tiles read as defined, bordered button-cards */
+.hero-tile {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.24);
+  border-radius: 14px;
+  padding: 13px 14px 11px;
+  min-width: 92px;
 }
-.hero-tile-label { color: rgba(255,255,255,0.92); font-weight: 600; }
+.hero-tile:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.55);
+  transform: translateY(-3px);
+}
+.hero-tile-mark {
+  width: 40px; height: 40px;
+  border: none;
+  background: #fff;
+  color: var(--tile-color, var(--primary));
+  box-shadow: 0 2px 8px rgba(0,0,0,0.20);
+}
+.hero-tile-label { color: rgba(255,255,255,0.95); font-weight: 600; }
 
 /* ── Section headers: bolder navy title with a red accent underline ─────── */
 .section-eyebrow { color: var(--accent-red); }
