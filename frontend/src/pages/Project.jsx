@@ -5,19 +5,44 @@ import { TYPE_FILTERS } from "../constants";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 
+const PAGE_SIZE = 12;
+
 export default function Project() {
   const { slug } = useParams();
   const [project, setProject] = useState(null);
+  const [projectError, setProjectError] = useState("");
   const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [type, setType] = useState("all");
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   useEffect(() => {
-    fetchProject(slug).then(setProject).catch(console.error);
+    fetchProject(slug)
+      .then(setProject)
+      .catch(() => setProjectError("Couldn't load this project."));
   }, [slug]);
 
   useEffect(() => {
-    fetchResources({ project: slug, type }).then(setResources).catch(console.error);
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    setVisible(PAGE_SIZE);
+    fetchResources({ project: slug, type })
+      .then((data) => { if (!cancelled) setResources(data); })
+      .catch(() => { if (!cancelled) setError("Couldn't load resources. Please try again."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [slug, type]);
+
+  if (projectError) {
+    return (
+      <main className="main">
+        <Link to="/" className="back-link">← Back to Hub</Link>
+        <div className="empty-state" style={{ marginTop: "1rem" }}><p>{projectError}</p></div>
+      </main>
+    );
+  }
 
   if (!project) {
     return (
@@ -27,6 +52,8 @@ export default function Project() {
       </main>
     );
   }
+
+  const shown = resources.slice(0, visible);
 
   return (
     <main className="main">
@@ -54,15 +81,42 @@ export default function Project() {
       <div className="resource-panel">
         <div className="resource-panel-header">
           <h3>{project.name} Resources</h3>
-          <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
+          {!loading && !error && (
+            <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
+          )}
         </div>
-        <div className="resources-grid">
-          {resources.map((r) => (
-            <ResourceTile key={r.id} resource={r} showProject={false} />
-          ))}
-        </div>
-        {resources.length === 0 && (
+        {loading ? (
+          <div className="resources-grid" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="resource-tile tile-skeleton" aria-hidden="true">
+                <div className="tile-thumb tile-thumb-skel" />
+                <div className="tile-body">
+                  <div className="skel-line skel-badge" />
+                  <div className="skel-line" />
+                  <div className="skel-line short" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="empty-state"><p>{error}</p></div>
+        ) : resources.length === 0 ? (
           <div className="empty-state"><p>No resources found.</p></div>
+        ) : (
+          <>
+            <div className="resources-grid">
+              {shown.map((r) => (
+                <ResourceTile key={r.id} resource={r} showProject={false} />
+              ))}
+            </div>
+            {visible < resources.length && (
+              <div className="load-more-wrap">
+                <button className="btn-load-more" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
+                  Load more ({resources.length - visible} more)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

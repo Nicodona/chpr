@@ -27,20 +27,59 @@ function isPdf(url) {
   return url.split("?")[0].toLowerCase().endsWith(".pdf");
 }
 
-// ── Video thumbnail ───────────────────────────────────────────────────────────
-// Uses a hidden <video> element. After metadata loads we seek to 2 s (or 10 %
-// of duration) so the browser paints that frame — no canvas / CORS required.
-function VideoThumb({ src }) {
-  const vidRef = useRef(null);
+const LANG_SHORT = { en: "EN", fr: "FR", pcm: "Pidgin", ful: "Fulfulde" };
 
+// Pick the URL to thumbnail/preview: prefer English, else first language file,
+// else the legacy single file_url.
+function primaryUrl(resource) {
+  const langs = resource.languages || [];
+  const en = langs.find((l) => l.language === "en");
+  return (en && en.url) || (langs[0] && langs[0].url) || resource.file_url || null;
+}
+
+// ── Lazy mount: only render heavy thumbnails once the tile scrolls near view.
+// Stops the page from fetching every PDF/video up-front (the slow-load cause).
+function useInView() {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || inView) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) { setInView(true); io.disconnect(); }
+      },
+      { rootMargin: "300px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView]);
+  return [ref, inView];
+}
+
+function DocFallback({ tag }) {
+  return (
+    <div className="tile-doc-page tile-doc-page-fallback">
+      <div className="tile-doc-corner" />
+      <div className="tile-doc-header" />
+      <div className="tile-doc-line" />
+      <div className="tile-doc-line short" />
+      <div className="tile-doc-line" />
+      <div className="tile-doc-line medium" />
+    </div>
+  );
+}
+
+// ── Video thumbnail (metadata only; lazy) ─────────────────────────────────────
+function VideoThumb({ src, active }) {
+  const vidRef = useRef(null);
   function handleMeta() {
     const v = vidRef.current;
     if (v) v.currentTime = Math.min(2, (v.duration || 20) * 0.1);
   }
-
   return (
     <div className="tile-thumb tile-thumb-video">
-      {src && (
+      {active && src && (
         <video
           ref={vidRef}
           src={src}
@@ -54,26 +93,19 @@ function VideoThumb({ src }) {
       )}
       <div className="tile-thumb-video-bg" />
       <div className="tile-thumb-play" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z" />
-        </svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
       </div>
       <span className="tile-thumb-tag">VIDEO</span>
     </div>
   );
 }
 
-// ── PDF thumbnail ─────────────────────────────────────────────────────────────
-// Renders page 1 of the PDF to a canvas via PDF.js (loaded from CDN on demand).
-// Falls back to the CSS document illustration if PDF.js is unavailable or the
-// file can't be fetched (e.g. CORS / network error).
-function PdfThumb({ src }) {
+// ── PDF thumbnail (renders page 1; only when `active`) ────────────────────────
+function PdfThumb({ src, active }) {
   const [imgUrl, setImgUrl] = useState(null);
-
   useEffect(() => {
-    if (!src) return;
+    if (!src || !active) return;
     let cancelled = false;
-
     (async () => {
       try {
         const pdfjs = await getPdfJs();
@@ -89,50 +121,25 @@ function PdfThumb({ src }) {
         await page.render({ canvasContext: canvas.getContext("2d"), viewport: scaledVp }).promise;
         if (!cancelled) setImgUrl(canvas.toDataURL("image/jpeg", 0.85));
       } catch {
-        // CSS fallback shown automatically when imgUrl stays null
+        /* CSS fallback stays */
       }
     })();
-
     return () => { cancelled = true; };
-  }, [src]);
+  }, [src, active]);
 
   return (
     <div className="tile-thumb tile-thumb-pdf">
-      {!imgUrl && (
-        <div className="tile-doc-page tile-doc-page-fallback">
-          <div className="tile-doc-corner" />
-          <div className="tile-doc-header" />
-          <div className="tile-doc-line" />
-          <div className="tile-doc-line short" />
-          <div className="tile-doc-line" />
-          <div className="tile-doc-line medium" />
-        </div>
-      )}
-      {imgUrl && (
-        <img
-          src={imgUrl}
-          className="tile-pdf-img tile-pdf-img-ready"
-          alt=""
-          aria-hidden="true"
-        />
-      )}
+      {!imgUrl && <DocFallback />}
+      {imgUrl && <img src={imgUrl} className="tile-pdf-img tile-pdf-img-ready" alt="" aria-hidden="true" />}
       <span className="tile-thumb-tag tile-thumb-tag-pdf">PDF</span>
     </div>
   );
 }
 
-// ── Generic document thumbnail (CSS-drawn fallback) ───────────────────────────
 function DocThumb() {
   return (
     <div className="tile-thumb tile-thumb-pdf">
-      <div className="tile-doc-page tile-doc-page-fallback">
-        <div className="tile-doc-corner" />
-        <div className="tile-doc-header" />
-        <div className="tile-doc-line" />
-        <div className="tile-doc-line short" />
-        <div className="tile-doc-line" />
-        <div className="tile-doc-line medium" />
-      </div>
+      <DocFallback />
       <span className="tile-thumb-tag tile-thumb-tag-pdf">FILE</span>
     </div>
   );
@@ -140,34 +147,38 @@ function DocThumb() {
 
 // ── Main exported component ───────────────────────────────────────────────────
 export default function ResourceTile({ resource, showProject = true }) {
-  const { type_key, file_url } = resource;
+  const { type_key } = resource;
   const typeLabel = resource.type_label || TYPE_LABELS[type_key] || type_key;
   const typeClass = TYPE_CLASS[type_key] || "";
+  const url = primaryUrl(resource);
+  const langs = resource.languages || [];
+  const [ref, inView] = useInView();
 
   let thumb;
   if (type_key === "vid") {
-    thumb = <VideoThumb src={file_url} />;
-  } else if (isPdf(file_url)) {
-    thumb = <PdfThumb src={file_url} />;
+    thumb = <VideoThumb src={url} active={inView} />;
+  } else if (isPdf(url)) {
+    thumb = <PdfThumb src={url} active={inView} />;
   } else {
     thumb = <DocThumb />;
   }
 
-  const body = (
-    <>
+  return (
+    <Link to={`/resources/${resource.id}`} className="resource-tile" ref={ref}>
       {thumb}
       <div className="tile-body">
         <span className={`res-type-badge ${typeClass}`}>{typeLabel}</span>
         <h3 className="tile-title">{resource.name}</h3>
         {showProject && <span className="tile-project">{resource.project_name}</span>}
         {resource.description && <p className="tile-desc">{resource.description}</p>}
+        {langs.length > 1 && (
+          <div className="tile-langs" aria-label="Available languages">
+            {langs.map((l) => (
+              <span key={l.language} className="tile-lang-pill">{LANG_SHORT[l.language] || l.language}</span>
+            ))}
+          </div>
+        )}
       </div>
-    </>
-  );
-
-  return (
-    <Link to={`/resources/${resource.id}`} className="resource-tile">
-      {body}
     </Link>
   );
 }

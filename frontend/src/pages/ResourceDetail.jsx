@@ -633,6 +633,7 @@ export default function ResourceDetail() {
   const [numPages, setNumPages] = useState(0);
   const [quizOpen, setQuizOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedLang, setSelectedLang] = useState("");
   const apiSyncTimerRef = useRef(null);
 
   // Load resource + progress (API for authenticated users, cookie/localStorage otherwise)
@@ -758,8 +759,16 @@ export default function ResourceDetail() {
   const typeLabel = resource.type_label || TYPE_LABELS[type_key] || type_key;
   const typeClass = TYPE_CLASS[type_key] || "";
 
-  const isPdf = file_url?.split("?")[0].toLowerCase().endsWith(".pdf");
+  // Language variants: pick the active file (default English, else first).
+  const LANG_NAMES = { en: "English", fr: "French", pcm: "Pidgin", ful: "Fulfulde" };
+  const langs = resource.languages || [];
+  const activeLang = selectedLang
+    || (langs.find((l) => l.language === "en") ? "en" : (langs[0]?.language || ""));
+  const activeFile = langs.find((l) => l.language === activeLang);
+  const activeUrl = (activeFile && activeFile.url) || file_url;
+
   const isVideo = type_key === "vid";
+  const isPdf = activeUrl?.split("?")[0].toLowerCase().endsWith(".pdf");
 
   const savedProgress = loadProgress(id);
   const initialVideoPercent = savedProgress.progress ?? 0;
@@ -817,18 +826,35 @@ export default function ResourceDetail() {
       {/* Reader section */}
       <div className="rd-reader-section">
         <div className="rd-reader-header">
-          <h2 className="rd-section-title">Document</h2>
-          {file_url && (
+          <h2 className="rd-section-title">{isVideo ? "Video" : "Document"}</h2>
+          {activeUrl && (
             <a
-              href={file_url}
+              href={activeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: "0.875rem" }}
+              className="rd-openfile-link"
             >
-              Open file ↗
+              {isVideo ? "Open video" : "Open file"} ↗
             </a>
           )}
         </div>
+
+        {/* Language switcher (only when more than one language exists) */}
+        {langs.length > 1 && (
+          <div className="rd-lang-switch" role="group" aria-label="Choose language">
+            {langs.map((l) => (
+              <button
+                key={l.language}
+                type="button"
+                className={"rd-lang-btn" + (l.language === activeLang ? " rd-lang-btn-active" : "")}
+                aria-pressed={l.language === activeLang}
+                onClick={() => setSelectedLang(l.language)}
+              >
+                {LANG_NAMES[l.language] || l.language_label || l.language}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="rd-progress-wrap">
@@ -838,27 +864,29 @@ export default function ResourceDetail() {
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="rd-progress-label">{progress}% read</span>
+          <span className="rd-progress-label">{progress}% {isVideo ? "watched" : "read"}</span>
         </div>
 
         <div className="rd-reader-box">
-          {isPdf && file_url ? (
+          {isPdf && activeUrl ? (
             <PdfDocReader
-              url={file_url}
+              key={activeUrl}
+              url={activeUrl}
               seenPages={seenPages}
               onPageSeen={handlePageSeen}
               onNumPages={handleNumPages}
             />
-          ) : isVideo && file_url ? (
+          ) : isVideo && activeUrl ? (
             <VideoDocReader
-              url={file_url}
+              key={activeUrl}
+              url={activeUrl}
               initialPercent={initialVideoPercent}
               onProgress={handleVideoProgress}
             />
-          ) : file_url ? (
+          ) : activeUrl ? (
             <div className="rd-other-file">
               <p>This file cannot be previewed in the browser.</p>
-              <a href={file_url} target="_blank" rel="noopener noreferrer" className="rd-quiz-btn rd-quiz-btn-active">
+              <a href={activeUrl} target="_blank" rel="noopener noreferrer" className="rd-quiz-btn rd-quiz-btn-active">
                 Download / open file ↗
               </a>
             </div>
@@ -877,7 +905,7 @@ export default function ResourceDetail() {
             <h2 className="rd-section-title" style={{ margin: 0 }}>Test Your Understanding</h2>
             {progress < 100 && (
               <p style={{ margin: "0.25rem 0 0", fontSize: "0.875rem", color: "var(--muted, #888)" }}>
-                Finish reading the document to unlock the quiz ({progress}% complete).
+                Finish {isVideo ? "watching the video" : "reading the document"} to unlock the quiz ({progress}% complete).
               </p>
             )}
           </div>

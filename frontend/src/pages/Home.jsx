@@ -41,6 +41,8 @@ export default function Home() {
   const { user }        = useAuth();
   const [projects, setProjects]   = useState([]);
   const [resources, setResources] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
   const [type, setType]           = useState("all");
   const [q, setQ]                 = useState("");
   const navigate                  = useNavigate();
@@ -52,7 +54,14 @@ export default function Home() {
 
   useEffect(() => { fetchProjects().then(setProjects).catch(console.error); }, []);
   useEffect(() => {
-    fetchResources(type === "pool" ? { type:"pool" } : { type }).then(setResources).catch(console.error);
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    fetchResources(type === "pool" ? { type:"pool" } : { type })
+      .then((data) => { if (!cancelled) setResources(data); })
+      .catch(() => { if (!cancelled) setError("Couldn't load resources. Please try again."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [type]);
 
   return (
@@ -169,13 +178,34 @@ export default function Home() {
         <div className="resource-panel">
           <div className="resource-panel-header">
             <h3>All resources</h3>
-            <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
+            {!loading && !error && (
+              <span>{resources.length} resource{resources.length !== 1 ? "s" : ""}</span>
+            )}
           </div>
-          <div className="resources-grid">
-            {resources.slice(0, 8).map(r => (
-              <ResourceTile key={r.id} resource={r} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="resources-grid" aria-busy="true">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="resource-tile tile-skeleton" aria-hidden="true">
+                  <div className="tile-thumb tile-thumb-skel" />
+                  <div className="tile-body">
+                    <div className="skel-line skel-badge" />
+                    <div className="skel-line" />
+                    <div className="skel-line short" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="empty-state"><p>{error}</p></div>
+          ) : resources.length === 0 ? (
+            <div className="empty-state"><p>No resources found.</p></div>
+          ) : (
+            <div className="resources-grid">
+              {resources.slice(0, 8).map(r => (
+                <ResourceTile key={r.id} resource={r} />
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </>
