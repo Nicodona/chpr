@@ -4539,3 +4539,94 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tile-thumb-skel, .skel-line { animation: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   BRAND REFRESH — palcameroon / CHPR identity: deep blue + accent red.
+   Appended override (supersedes earlier rules); base layout untouched.
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  --accent-red: #de2039;
+  --accent-red-dark: #b81a2e;
+  --brand-blue-bright: #0a6bcd;
+  --navy: #16263f;
+  --brand-grad: linear-gradient(115deg, #0054a6 0%, #0a6bcd 100%);
+  --brand-grad-hover: linear-gradient(115deg, #00478c 0%, #0a5fb8 100%);
+  --page-bg: #eef2f8;
+}
+
+/* Page background — gentle blue wash so white cards gain depth */
+body { background: var(--page-bg); }
+
+/* ── Header: solid brand-blue bar (matches palcameroon) ─────────────────── */
+.nav { background: var(--brand-grad); border-bottom: none; box-shadow: 0 2px 14px rgba(0,40,90,0.20); }
+.nav-logo-mark { background: #fff; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.nav-logo-text { color: #fff; }
+.nav-logo-text span { color: rgba(255,255,255,0.72); }
+.nav-link { color: rgba(255,255,255,0.88); }
+.nav-link:hover, .nav-link.active { color: #fff; background: rgba(255,255,255,0.16); }
+.nav-search { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.30); }
+.nav-search input { color: #fff; }
+.nav-search input::placeholder { color: rgba(255,255,255,0.72); }
+.nav-search:focus-within { background: #fff; border-color: #fff; }
+.nav-search:focus-within input { color: var(--dark); }
+.nav-search:focus-within input::placeholder { color: #aab; }
+.nav-contact-guest { background: transparent; color: #fff; border-color: rgba(255,255,255,0.55); }
+.nav-contact-guest:hover { background: rgba(255,255,255,0.16); border-color: #fff; color: #fff; }
+.nav-cta-secondary { background: #fff; color: var(--primary); border-color: #fff; font-weight: 700; }
+.nav-cta-secondary:hover { background: #eef5fd; color: var(--primary-dark); }
+.nav-user-trigger { border-color: rgba(255,255,255,0.42); }
+.nav-user-trigger:hover { border-color: #fff; background: rgba(255,255,255,0.16); }
+.nav-user-name { color: #fff; }
+.nav-user-trigger .nav-user-avatar { background: #fff !important; color: var(--primary); }
+.nav-user-caret-icon { color: rgba(255,255,255,0.85); }
+.nav-hamburger { color: #fff; }
+.nav-mobile-drawer { background: #fff; }
+/* Drawer sits on white — its links must use dark text, not the blue-bar white */
+.nav-mobile-drawer .nav-link { color: var(--dark); }
+.nav-mobile-drawer .nav-link:hover,
+.nav-mobile-drawer .nav-link.active { color: var(--primary); background: var(--primary-light); }
+
+/* ── Hero: deep brand-blue gradient (was near-black) + red accent word ──── */
+.hero-anim { background: linear-gradient(135deg, #04244a 0%, #073a72 55%, #0a4f96 100%); }
+.hero-anim-title-accent { color: #ff6172; }
+.hero-search-btn { background: var(--brand-grad); }
+.hero-search-btn:hover { background: var(--brand-grad-hover); }
+
+/* ── Section headers: bolder navy title with a red accent underline ─────── */
+.section-eyebrow { color: var(--accent-red); }
+.section-header { align-items: flex-end; }
+.section-title { font-size: 1.5rem; font-weight: 700; color: var(--navy); position: relative; padding-bottom: 11px; }
+.section-header h2.section-title { font-size: 1.5rem; }
+.section-title::after {
+  content: ""; position: absolute; left: 0; bottom: 0;
+  width: 46px; height: 3px; border-radius: 2px; background: var(--accent-red);
+}
+.section-link { color: var(--primary); font-weight: 600; }
+.section-link:hover { color: var(--accent-red); text-decoration: none; }
+
+/* ── Resource panel: soft brand tint header + depth ─────────────────────── */
+.resource-panel { box-shadow: var(--card-shadow); }
+.resource-panel-header {
+  background: linear-gradient(90deg, #e8f1fb, #f5f9fe);
+  border-bottom: 2px solid var(--primary-light);
+}
+.resource-panel-header h3 { color: var(--navy); font-size: 15px; }
+
+/* ── Filter pills: larger tap target + depth when active ────────────────── */
+.filter-btn { padding: 8px 16px; min-height: 38px; }
+.filter-btn.active { box-shadow: 0 3px 10px rgba(0,84,166,0.28); }
+
+/* ── Primary buttons: gradient + lift ───────────────────────────────────── */
+.btn-primary { background: var(--brand-grad); box-shadow: 0 3px 12px rgba(0,84,166,0.28); }
+.btn-primary:hover { background: var(--brand-grad-hover); }
+
+/* ── Project cards: colored top accent + hover lift ─────────────────────── */
+.project-card { border-top: 3px solid var(--card-accent, var(--primary)); box-shadow: var(--card-shadow); }
+.project-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+
+/* ── Resource tiles: subtle hover lift ──────────────────────────────────── */
+.resource-tile { transition: transform .15s ease, box-shadow .15s ease; }
+.resource-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+/* ── Pagination active uses the brand gradient ──────────────────────────── */
+.page-btn-active { background: var(--brand-grad); border-color: var(--primary); }
