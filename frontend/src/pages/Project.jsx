@@ -40,6 +40,11 @@ export default function Project() {
 
   useEffect(() => { setPage(1); }, [type]);
 
+  // Derived values — MUST be declared before the early returns below so these
+  // hooks run on every render (React Rules of Hooks; otherwise error #310).
+  const typeFilters = useMemo(() => availableTypeFilters(resources), [resources]);
+  const filtered = useMemo(() => filterByType(resources, type), [resources, type]);
+
   if (projectError) {
     return (
       <main className="main">
@@ -58,8 +63,6 @@ export default function Project() {
     );
   }
 
-  const typeFilters = useMemo(() => availableTypeFilters(resources), [resources]);
-  const filtered = useMemo(() => filterByType(resources, type), [resources, type]);
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const shown = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   function goToPage(p) {

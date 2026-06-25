@@ -14,6 +14,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
+from django.views.decorators.cache import never_cache
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.http import require_GET
@@ -57,7 +58,10 @@ urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += static(settings.STATIC_URL, document_root=os.path.join(settings.BASE_DIR, 'build', 'static'))
 urlpatterns += static('/images/', document_root=os.path.join(settings.BASE_DIR, 'build', 'images'))
 
-# React catch-all route (MUST BE LAST).
+# React catch-all route (MUST BE LAST). never_cache so the browser always
+# revalidates index.html and picks up new hashed bundle names after a deploy —
+# a cached index.html pointing at a deleted bundle would render a blank page.
 urlpatterns += [
-    re_path(r'^(?!api/|media/|static/|images/).*$', TemplateView.as_view(template_name="index.html")),
+    re_path(r'^(?!api/|media/|static/|images/).*$',
+            never_cache(TemplateView.as_view(template_name="index.html"))),
 ]

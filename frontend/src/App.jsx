@@ -34,6 +34,7 @@ function AppInner() {
     <>
       <TrackPageView />
       <Nav />
+      <div className="app-main">
       <Routes>
         {/* ── Public routes ── */}
         <Route path="/"                element={<Home />} />
@@ -74,6 +75,7 @@ function AppInner() {
         {/* ── Catch-all ── */}
         <Route path="*" element={<Home />} />
       </Routes>
+      </div>
       <Footer />
       <FAQButton />
     </>

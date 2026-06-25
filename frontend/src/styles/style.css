@@ -4658,6 +4658,12 @@ body { background: var(--page-bg); }
 /* ── Pagination active uses the brand gradient ──────────────────────────── */
 .page-btn-active { background: var(--brand-grad); border-color: var(--primary); }
 
+/* ── Sticky footer: keep the footer pinned to the viewport bottom even when
+   the page content is short (e.g. while loading) instead of floating mid-page. */
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+.app-main { flex: 1 0 auto; }
+.footer { flex-shrink: 0; }
+
 /* ── Mobile tap targets: comfortable touch areas for header/detail links ── */
 @media (max-width: 640px) {
   .back-link, .rd-back, .rd-share-btn, .rd-project-link {
