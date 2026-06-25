@@ -58,6 +58,11 @@ class Project(models.Model):
     description = models.TextField(blank=True)
     color = models.CharField(max_length=9, default="#0054A6", help_text="Accent colour (hex)")
     light_color = models.CharField(max_length=9, default="#e6f1fb", help_text="Light accent (hex)")
+    logo = models.FileField(
+        upload_to="projects/logos/", blank=True, null=True,
+        help_text="Programme logo (PNG with transparency works best). Shown as a "
+                  "watermark behind the project card.",
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     order = models.PositiveIntegerField(default=0, help_text="Display order on the hub")
     is_active = models.BooleanField(default=True, help_text="Inactive projects are hidden from the public site.")
@@ -73,6 +78,39 @@ class Project(models.Model):
     @property
     def resource_count(self):
         return self.resources.count()
+
+
+class SiteConfig(models.Model):
+    """Singleton of site-wide display settings, editable in the Django admin.
+    Always use SiteConfig.get() to read it."""
+
+    nav_projects_count = models.PositiveIntegerField(
+        default=6,
+        help_text="How many projects to list in the nav 'Projects' dropdown "
+                  "(newest first). Keeps the menu short as projects grow.",
+    )
+    home_projects_count = models.PositiveIntegerField(
+        default=6,
+        help_text="How many projects to feature on the home page before the "
+                  "'View all projects' link (newest first).",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Site configuration"
+        verbose_name_plural = "Site configuration"
+
+    def __str__(self):
+        return "Site configuration"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # enforce a single row
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
 
 class Resource(models.Model):

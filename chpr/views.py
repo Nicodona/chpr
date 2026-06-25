@@ -20,7 +20,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceInteraction, SiteVisit, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
 from .serializers import (
     ChangePasswordSerializer,
     ContactMessageSerializer,
@@ -32,6 +32,7 @@ from .serializers import (
     QuizQuestionPublicSerializer,
     ResourceCommentSerializer,
     ResourceSerializer,
+    SiteConfigSerializer,
     UserSerializer,
 )
 
@@ -146,6 +147,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
             qs = qs.filter(is_active=True)
         return qs
 
+    @action(detail=False, methods=["get"])
+    def nav(self, request):
+        """Projects for the nav 'Projects' dropdown: newest first, capped by the
+        admin-controlled SiteConfig.nav_projects_count."""
+        limit = SiteConfig.get().nav_projects_count
+        qs = self.get_queryset().order_by("-created_at")[:limit]
+        ser = self.get_serializer(qs, many=True)
+        return Response(ser.data)
+
     def perform_create(self, serializer):
         if not _is_admin(self.request.user):
             raise PermissionDenied("Admin access required.")
@@ -160,6 +170,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not _is_admin(self.request.user):
             raise PermissionDenied("Admin access required.")
         instance.delete()
+
+
+class SiteConfigView(APIView):
+    """GET /api/site-config/ — public display settings (how many projects to
+    feature on the home page and in the nav dropdown)."""
+    authentication_classes = AUTH_BACKENDS
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(SiteConfigSerializer(SiteConfig.get()).data)
 
 
 class ResourceViewSet(viewsets.ModelViewSet):

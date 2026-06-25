@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { fetchNavProjects } from "../api";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -95,9 +96,12 @@ export default function Nav() {
   const [menuOpen, setMenuOpen]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [navProjects, setNavProjects] = useState([]);
   const { user, logout }        = useAuth();
   const navigate                 = useNavigate();
   const menuRef                  = useRef(null);
+  const projectsRef              = useRef(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -107,6 +111,21 @@ export default function Nav() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
+
+  useEffect(() => {
+    fetchNavProjects().then(setNavProjects).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!projectsOpen) return;
+    const handler = e => {
+      if (projectsRef.current && !projectsRef.current.contains(e.target)) setProjectsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [projectsOpen]);
+
+  const projInitials = (p) => (p.short_name || p.name || "").slice(0, 2).toUpperCase();
 
   function submitSearch(e) {
     if (e.key === "Enter" && q.trim()) {
@@ -144,6 +163,36 @@ export default function Nav() {
 
         <div className="nav-links">
           <Link to="/resources" className="nav-link">All Resources</Link>
+
+          <div className="nav-projects-menu" ref={projectsRef}>
+            <button
+              type="button"
+              className="nav-link nav-projects-trigger"
+              onClick={() => setProjectsOpen(o => !o)}
+              aria-expanded={projectsOpen}
+              aria-haspopup="true"
+            >
+              Projects
+              <svg className="nav-projects-caret" style={{ width:11, height:11, marginLeft:6, transition:"transform .15s", transform: projectsOpen ? "rotate(180deg)" : "none" }} viewBox="0 0 12 12" fill="none">
+                <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+            <div className={["nav-projects-dropdown", projectsOpen ? "open" : ""].join(" ")}>
+              {navProjects.length === 0 ? (
+                <span className="nav-projects-empty">No projects yet</span>
+              ) : (
+                navProjects.map(p => (
+                  <Link key={p.slug} to={`/projects/${p.slug}`} className="nav-projects-item" onClick={() => setProjectsOpen(false)}>
+                    <span className="nav-projects-mark" style={{ background: p.color || "var(--primary)" }}>{projInitials(p)}</span>
+                    <span className="nav-projects-name">{p.name}</span>
+                  </Link>
+                ))
+              )}
+              <Link to="/projects" className="nav-projects-all" onClick={() => setProjectsOpen(false)}>
+                View all projects →
+              </Link>
+            </div>
+          </div>
         </div>
 
         <div className="nav-search">
@@ -242,6 +291,18 @@ export default function Nav() {
         {mobileOpen && (
           <div className="nav-mobile-drawer">
             <Link to="/resources" className="nav-link" onClick={() => setMobileOpen(false)}>All Resources</Link>
+            {navProjects.length > 0 && (
+              <>
+                <div className="nav-drawer-label">Projects</div>
+                {navProjects.map(p => (
+                  <Link key={p.slug} to={`/projects/${p.slug}`} className="nav-link nav-drawer-project" onClick={() => setMobileOpen(false)}>
+                    <span className="nav-projects-mark" style={{ background: p.color || "var(--primary)" }}>{projInitials(p)}</span>
+                    {p.name}
+                  </Link>
+                ))}
+                <Link to="/projects" className="nav-link" onClick={() => setMobileOpen(false)}>View all projects →</Link>
+              </>
+            )}
             <div className="nav-menu-divider" />
             {user ? (
               <>

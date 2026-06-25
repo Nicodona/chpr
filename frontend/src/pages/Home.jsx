@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchProjects, fetchResources } from "../api";
+import { fetchProjects, fetchResources, fetchSiteConfig } from "../api";
 import { availableTypeFilters, filterByType, hasPoolResources } from "../filters";
 import { useAuth } from "../context/AuthContext";
 import ResourceTile from "../components/ResourceTile";
+import ProjectCard from "../components/ProjectCard";
 import Filters from "../components/Filters";
 
 const PUBLIC_TILES = [
@@ -23,6 +24,7 @@ export default function Home() {
   const [error, setError]         = useState("");
   const [type, setType]           = useState("all");
   const [q, setQ]                 = useState("");
+  const [homeCount, setHomeCount] = useState(6);
   const navigate                  = useNavigate();
 
   // Hide the "Pool Tests" quick link until pool resources actually exist.
@@ -34,6 +36,9 @@ export default function Home() {
   }, [user, resources]);
 
   useEffect(() => { fetchProjects().then(setProjects).catch(console.error); }, []);
+  useEffect(() => {
+    fetchSiteConfig().then((c) => setHomeCount(c.home_projects_count)).catch(() => {});
+  }, []);
   // Fetch everything once; type pills + filtering are derived client-side.
   useEffect(() => {
     let cancelled = false;
@@ -100,32 +105,14 @@ export default function Home() {
             <span className="section-eyebrow">Active programmes</span>
             <h2 className="section-title">Projects</h2>
           </div>
-          <Link to="/resources" className="section-link">View all resources →</Link>
+          {projects.length > homeCount && (
+            <Link to="/projects" className="section-link">View all projects →</Link>
+          )}
         </div>
 
         <div className="projects-grid">
-          {projects.map(p => (
-            <Link
-              key={p.slug}
-              to={`/projects/${p.slug}`}
-              className="project-card"
-              style={{ "--card-accent": p.color, "--card-accent-light": p.light_color }}
-            >
-              <div className="project-card-top">
-                <span className="project-card-mark">
-                  {p.short_name?.slice(0,2).toUpperCase() || p.name.slice(0,2).toUpperCase()}
-                </span>
-                <span className={`badge badge-${p.status === "completed" ? "completed" : "active"}`}>
-                  {p.status_display || p.status}
-                </span>
-              </div>
-              <h3>{p.name}</h3>
-              <p>{p.description}</p>
-              <div className="project-meta">
-                <span className="project-count">{p.resource_count} resource{p.resource_count !== 1 ? "s" : ""}</span>
-                <span className="project-arrow" aria-hidden="true">→</span>
-              </div>
-            </Link>
+          {projects.slice(0, homeCount).map((p) => (
+            <ProjectCard key={p.slug} project={p} />
           ))}
         </div>
 

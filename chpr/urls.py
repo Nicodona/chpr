@@ -16,6 +16,7 @@ from .views import (
     QuizQuestionViewSet,
     ResourceCommentViewSet,
     ResourceViewSet,
+    SiteConfigView,
     TrackInteractionView,
     TrackVisitView,
 )
@@ -30,6 +31,7 @@ router.register("faq", FAQViewSet, basename="faq")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("site-config/", SiteConfigView.as_view(), name="site-config"),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
     path("auth/me/", MeView.as_view(), name="auth-me"),

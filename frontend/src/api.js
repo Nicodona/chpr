@@ -88,6 +88,22 @@ export async function fetchProject(slug) {
   return res.json();
 }
 
+/** Projects for the nav dropdown: newest first, capped by the admin setting. */
+export async function fetchNavProjects() {
+  const res = await fetch(`${BASE}/api/projects/nav/`);
+  if (!res.ok) throw new Error("Failed to fetch nav projects");
+  const data = await res.json();
+  return data.results ?? data;
+}
+
+// ── Site config (admin-controlled display settings) ───────────────────────────
+
+export async function fetchSiteConfig() {
+  const res = await fetch(`${BASE}/api/site-config/`);
+  if (!res.ok) throw new Error("Failed to fetch site config");
+  return res.json();
+}
+
 // ── Resources ─────────────────────────────────────────────────────────────────
 
 /**

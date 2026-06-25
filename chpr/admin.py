@@ -1,7 +1,7 @@
 """Django admin registrations for the CHPR Resources Hub."""
 from django.contrib import admin
 
-from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceFile, ResourceInteraction, SiteVisit, StaffProfile
+from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceFile, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
 
 
 @admin.register(StaffProfile)
@@ -22,12 +22,30 @@ class ResourceInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "status", "resource_count", "order")
+    list_display = ("name", "slug", "status", "resource_count", "order", "has_logo")
     list_editable = ("status", "order")
     list_filter = ("status",)
     search_fields = ("name", "slug", "description")
     prepopulated_fields = {"slug": ("short_name",)}
     inlines = [ResourceInline]
+    fields = ("slug", "name", "short_name", "description", "color", "light_color",
+              "logo", "status", "order", "is_active")
+
+    @admin.display(boolean=True, description="Logo")
+    def has_logo(self, obj):
+        return bool(obj.logo)
+
+
+@admin.register(SiteConfig)
+class SiteConfigAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "nav_projects_count", "home_projects_count", "updated_at")
+
+    def has_add_permission(self, request):
+        # Singleton — only the one row (created on first access).
+        return not SiteConfig.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class ResourceFileInline(admin.TabularInline):

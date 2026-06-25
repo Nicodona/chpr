@@ -7,6 +7,7 @@ import FAQButton from "./components/FAQButton";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import AllResources from "./pages/AllResources";
+import ProjectsIndex from "./pages/ProjectsIndex";
 import Project from "./pages/Project";
 import AddResource from "./pages/AddResource";
 import ManagePanel from "./pages/ManagePanel";
@@ -40,6 +41,7 @@ function AppInner() {
         <Route path="/"                element={<Home />} />
         <Route path="/resources"       element={<AllResources />} />
         <Route path="/resources/:id"   element={<ResourceDetail />} />
+        <Route path="/projects"        element={<ProjectsIndex />} />
         <Route path="/projects/:slug"  element={<Project />} />
         <Route path="/login"           element={<Login />} />
         <Route path="/faq"             element={<FAQ />} />

@@ -5,7 +5,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from rest_framework.test import APIClient
 
-from chpr.models import Project, Resource, ResourceFile
+from datetime import timedelta
+
+from django.utils import timezone
+
+from chpr.models import Project, Resource, ResourceFile, SiteConfig
 
 
 def _rows(payload):
@@ -76,3 +80,51 @@ class ResourceLanguageAPITests(TestCase):
                     resource=self.video, language="en",
                     file=SimpleUploadedFile("dupe.mp4", b"w"),
                 )
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ProjectsNavAndConfigTests(TestCase):
+    """Nav dropdown + home featuring are driven by SiteConfig (admin-controlled
+    counts) and ordered newest-first."""
+
+    def setUp(self):
+        self.client = APIClient()
+        base = timezone.now()
+        self.p1 = Project.objects.create(slug="a", name="Alpha")
+        self.p2 = Project.objects.create(slug="b", name="Beta")
+        self.p3 = Project.objects.create(slug="c", name="Gamma")
+        # Force a known created_at order (auto_now_add can collide in fast tests).
+        for i, p in enumerate([self.p1, self.p2, self.p3]):
+            Project.objects.filter(pk=p.pk).update(created_at=base + timedelta(minutes=i))
+
+    def test_site_config_endpoint_defaults(self):
+        res = self.client.get("/api/site-config/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"nav_projects_count": 6, "home_projects_count": 6})
+
+    def test_nav_returns_newest_first_capped_by_config(self):
+        cfg = SiteConfig.get()
+        cfg.nav_projects_count = 2
+        cfg.save()
+        res = self.client.get("/api/projects/nav/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([p["slug"] for p in res.json()], ["c", "b"])
+
+    def test_nav_hides_inactive_projects(self):
+        Project.objects.filter(pk=self.p3.pk).update(is_active=False)
+        res = self.client.get("/api/projects/nav/")
+        self.assertNotIn("c", [p["slug"] for p in res.json()])
+
+    def test_project_logo_url_is_null_without_logo(self):
+        res = self.client.get("/api/projects/")
+        rows = _rows(res.json())
+        self.assertIn("logo_url", rows[0])
+        self.assertIsNone(rows[0]["logo_url"])
+
+    def test_siteconfig_is_a_singleton(self):
+        SiteConfig.get()
+        dup = SiteConfig()
+        dup.nav_projects_count = 9
+        dup.save()
+        self.assertEqual(SiteConfig.objects.count(), 1)
+        self.assertEqual(SiteConfig.get().nav_projects_count, 9)

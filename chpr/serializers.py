@@ -5,20 +5,34 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, SiteConfig, StaffProfile
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     resource_count = serializers.IntegerField(read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = [
             "id", "slug", "name", "short_name", "description",
-            "color", "light_color", "status", "status_display",
+            "color", "light_color", "logo_url", "status", "status_display",
             "order", "is_active", "resource_count", "created_at", "updated_at",
         ]
+
+    def get_logo_url(self, obj):
+        if not obj.logo:
+            return None
+        request = self.context.get("request")
+        url = obj.logo.url
+        return request.build_absolute_uri(url) if request else url
+
+
+class SiteConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteConfig
+        fields = ["nav_projects_count", "home_projects_count"]
 
 
 class ProjectPKOrSlugField(serializers.PrimaryKeyRelatedField):

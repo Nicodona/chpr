@@ -4690,3 +4690,73 @@ body { background: var(--page-bg); }
   .filter-bar > .filter-label { flex: 0 0 auto; scroll-snap-align: start; }
   .filter-btn { min-height: 40px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PROJECT LOGOS, NAV DROPDOWN, SECTION BUTTONS
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Project card logo watermark (low opacity keeps the text on top readable) */
+.project-card-logo {
+  position: absolute; inset: 0;
+  background-repeat: no-repeat;
+  background-position: right -6% bottom -8%;
+  background-size: 56% auto;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.project-card-body { position: relative; z-index: 1; }
+
+/* Section links become outlined brand buttons (adds colour to the homepage) */
+.section-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 16px; border-radius: 9px; white-space: nowrap;
+  border: 1.5px solid var(--primary);
+  color: var(--primary); background: #fff;
+  font-weight: 700; font-size: 0.85rem;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.section-link:hover { background: var(--brand-grad); color: #fff; border-color: var(--primary); text-decoration: none; }
+.section-count { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+
+/* Nav "Projects" dropdown */
+.nav-projects-menu { position: relative; }
+.nav-projects-trigger {
+  display: inline-flex; align-items: center; cursor: pointer;
+  background: transparent; font-family: 'DM Sans', sans-serif;
+}
+.nav-projects-caret { color: rgba(255,255,255,0.85); }
+.nav-projects-dropdown {
+  position: absolute; top: calc(100% + 10px); left: 0;
+  min-width: 260px; max-width: 320px;
+  background: #fff; border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow-lg);
+  padding: 6px; display: none; z-index: 200;
+}
+.nav-projects-dropdown.open { display: block; }
+.nav-projects-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  text-decoration: none; color: var(--dark);
+}
+.nav-projects-item:hover { background: var(--primary-light); }
+.nav-projects-mark {
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 800;
+}
+.nav-projects-name { font-size: 14px; font-weight: 600; line-height: 1.25; }
+.nav-projects-empty { display: block; padding: 12px; color: var(--muted); font-size: 13px; }
+.nav-projects-all {
+  display: block; margin-top: 4px; padding: 9px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--primary); font-weight: 700; font-size: 13px; text-decoration: none;
+}
+.nav-projects-all:hover { color: var(--accent-red); }
+
+/* Mobile drawer projects */
+.nav-drawer-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); padding: 12px 12px 4px;
+}
+.nav-drawer-project { display: flex; align-items: center; gap: 10px; }
+.nav-drawer-project .nav-projects-mark { width: 26px; height: 26px; font-size: 10px; }
