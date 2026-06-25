@@ -4695,13 +4695,14 @@ body { background: var(--page-bg); }
    PROJECT LOGOS, NAV DROPDOWN, SECTION BUTTONS
    ════════════════════════════════════════════════════════════════════════ */
 
-/* Project card logo watermark (low opacity keeps the text on top readable) */
+/* Project card logo watermark — bolder, kept to the lower-right so the text
+   (top-left) stays clear. */
 .project-card-logo {
   position: absolute; inset: 0;
   background-repeat: no-repeat;
-  background-position: right -6% bottom -8%;
-  background-size: 56% auto;
-  opacity: 0.12;
+  background-position: right -4% bottom -6%;
+  background-size: 62% auto;
+  opacity: 0.24;
   pointer-events: none;
 }
 .project-card-body { position: relative; z-index: 1; }
