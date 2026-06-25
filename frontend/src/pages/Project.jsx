@@ -86,7 +86,7 @@ export default function Project() {
           )}
         </div>
         <div className="project-hero-info">
-          <span className="project-hero-eyebrow">CHPR Programme</span>
+          <span className="project-hero-eyebrow">CHPR Resources</span>
           <h1>{project.name}</h1>
           {project.description && <p>{project.description}</p>}
           <div className="project-hero-meta">

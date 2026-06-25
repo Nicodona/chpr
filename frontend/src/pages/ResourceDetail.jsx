@@ -216,8 +216,11 @@ function PdfDocReader({ url, seenPages, onPageSeen, onNumPages }) {
       const page = await pdfRef.current.getPage(pageNum);
       const vp0 = page.getViewport({ scale: 1 });
       const containerWidth = placeholder.clientWidth || 800;
-      const scale = containerWidth / vp0.width;
-      const vp = page.getViewport({ scale });
+      // Render the canvas backing store at device-pixel-ratio (super-sampled) so
+      // text stays sharp on hi-DPI screens; CSS scales it back down to 100%.
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const cssScale = containerWidth / vp0.width;
+      const vp = page.getViewport({ scale: cssScale * dpr });
 
       const canvas = document.createElement("canvas");
       canvas.width = vp.width;
@@ -770,6 +773,10 @@ export default function ResourceDetail() {
   const isVideo = type_key === "vid";
   const isPdf = activeUrl?.split("?")[0].toLowerCase().endsWith(".pdf");
 
+  // Clean filename for the Download button (keeps the real extension).
+  const fileExt = (activeUrl?.split("?")[0].split(".").pop() || "").toLowerCase();
+  const downloadName = fileExt && fileExt.length <= 5 ? `${name}.${fileExt}` : name;
+
   const savedProgress = loadProgress(id);
   const initialVideoPercent = savedProgress.progress ?? 0;
 
@@ -782,20 +789,37 @@ export default function ResourceDetail() {
 
       {/* Header */}
       <div className="rd-header">
-        <div className="rd-header-meta">
-          <span className={`res-type-badge ${typeClass}`}>{typeLabel}</span>
-          {project_slug && (
-            <Link to={`/projects/${project_slug}`} className="rd-project-link">
-              {project_name}
-            </Link>
-          )}
-          <button className={"rd-share-btn" + (copied ? " rd-share-copied" : "")} onClick={handleShare} title="Share this resource">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
-              <circle cx="15" cy="3.5" r="1.5"/><circle cx="15" cy="16.5" r="1.5"/><circle cx="5" cy="10" r="1.5"/>
-              <line x1="13.6" y1="4.5" x2="6.4" y2="9"/><line x1="13.6" y1="15.5" x2="6.4" y2="11"/>
-            </svg>
-            {copied ? "Copied!" : "Share"}
-          </button>
+        <div className="rd-header-top">
+          <div className="rd-header-tags">
+            <span className={`res-type-badge ${typeClass}`}>{typeLabel}</span>
+            {project_slug && (
+              <Link to={`/projects/${project_slug}`} className="rd-project-link">
+                {project_name}
+              </Link>
+            )}
+          </div>
+          <div className="rd-header-actions">
+            {activeUrl && (
+              <a
+                className="rd-download-btn"
+                href={activeUrl}
+                download={downloadName}
+                title={`Download ${isVideo ? "video" : "file"}`}
+              >
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
+                  <path d="M10 3v10m0 0l-3.5-3.5M10 13l3.5-3.5" /><path d="M4 16.5h12" />
+                </svg>
+                Download
+              </a>
+            )}
+            <button className={"rd-share-btn" + (copied ? " rd-share-copied" : "")} onClick={handleShare} title="Share this resource">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
+                <circle cx="15" cy="3.5" r="1.5"/><circle cx="15" cy="16.5" r="1.5"/><circle cx="5" cy="10" r="1.5"/>
+                <line x1="13.6" y1="4.5" x2="6.4" y2="9"/><line x1="13.6" y1="15.5" x2="6.4" y2="11"/>
+              </svg>
+              {copied ? "Copied!" : "Share"}
+            </button>
+          </div>
         </div>
         <h1 className="rd-title">{name}</h1>
         {description && <p className="rd-description">{description}</p>}
