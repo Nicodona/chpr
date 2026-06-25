@@ -804,12 +804,12 @@ export default function ResourceDetail() {
                 className="rd-download-btn"
                 href={activeUrl}
                 download={downloadName}
-                title={`Download ${isVideo ? "video" : "file"}`}
+                title={`Download the ${LANG_NAMES[activeLang] || "current"} ${isVideo ? "video" : "file"}`}
               >
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
                   <path d="M10 3v10m0 0l-3.5-3.5M10 13l3.5-3.5" /><path d="M4 16.5h12" />
                 </svg>
-                Download
+                Download{langs.length > 1 ? ` (${LANG_NAMES[activeLang] || activeLang})` : ""}
               </a>
             )}
             <button className={"rd-share-btn" + (copied ? " rd-share-copied" : "")} onClick={handleShare} title="Share this resource">
@@ -845,6 +845,27 @@ export default function ResourceDetail() {
             </span>
           )}
         </div>
+
+        {/* Language picker — controls the preview, Open and Download below */}
+        {langs.length > 1 && (
+          <div className="rd-lang-pick">
+            <span className="rd-lang-pick-label">Language</span>
+            <div className="rd-lang-switch" role="group" aria-label="Choose language">
+              {langs.map((l) => (
+                <button
+                  key={l.language}
+                  type="button"
+                  className={"rd-lang-btn" + (l.language === activeLang ? " rd-lang-btn-active" : "")}
+                  aria-pressed={l.language === activeLang}
+                  onClick={() => setSelectedLang(l.language)}
+                >
+                  {LANG_NAMES[l.language] || l.language_label || l.language}
+                </button>
+              ))}
+            </div>
+            <span className="rd-lang-pick-hint">applies to preview, open &amp; download</span>
+          </div>
+        )}
       </div>
 
       {/* Reader section */}
@@ -858,27 +879,10 @@ export default function ResourceDetail() {
               rel="noopener noreferrer"
               className="rd-openfile-link"
             >
-              {isVideo ? "Open video" : "Open file"} ↗
+              {isVideo ? "Open video" : "Open file"}{langs.length > 1 ? ` (${LANG_NAMES[activeLang] || activeLang})` : ""} ↗
             </a>
           )}
         </div>
-
-        {/* Language switcher (only when more than one language exists) */}
-        {langs.length > 1 && (
-          <div className="rd-lang-switch" role="group" aria-label="Choose language">
-            {langs.map((l) => (
-              <button
-                key={l.language}
-                type="button"
-                className={"rd-lang-btn" + (l.language === activeLang ? " rd-lang-btn-active" : "")}
-                aria-pressed={l.language === activeLang}
-                onClick={() => setSelectedLang(l.language)}
-              >
-                {LANG_NAMES[l.language] || l.language_label || l.language}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Progress bar */}
         <div className="rd-progress-wrap">
