@@ -87,7 +87,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Resource
         fields = [
-            "id", "project", "project_slug", "project_name",
+            "id", "slug", "project", "project_slug", "project_name",
             "name", "type_key", "type_label", "activity", "activity_label",
             "audience", "audience_label",
             "description", "file", "file_url", "languages",
@@ -96,6 +96,7 @@ class ResourceSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             "file": {"write_only": True, "required": False},
+            "slug": {"required": False},
         }
 
     def get_file_url(self, obj):

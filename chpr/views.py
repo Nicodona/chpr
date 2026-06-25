@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
@@ -198,6 +199,18 @@ class ResourceViewSet(viewsets.ModelViewSet):
     serializer_class = ResourceSerializer
     authentication_classes = AUTH_BACKENDS
     permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def get_object(self):
+        """Resolve the detail lookup by slug (permalink) or numeric id, so old
+        /api/resources/<id>/ links keep working while new ones use the slug."""
+        qs = self.filter_queryset(self.get_queryset())
+        lookup = self.kwargs.get("pk")
+        if lookup is not None and str(lookup).isdigit():
+            obj = get_object_or_404(qs, pk=lookup)
+        else:
+            obj = get_object_or_404(qs, slug=lookup)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     def get_queryset(self):
         qs = super().get_queryset()

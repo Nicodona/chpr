@@ -164,7 +164,7 @@ export default function ResourceTile({ resource, showProject = true }) {
   }
 
   return (
-    <Link to={`/resources/${resource.id}`} className="resource-tile" ref={ref}>
+    <Link to={`/resources/${resource.slug || resource.id}`} className="resource-tile" ref={ref}>
       {thumb}
       <div className="tile-body">
         <span className={`res-type-badge ${typeClass}`}>{typeLabel}</span>

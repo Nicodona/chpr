@@ -661,6 +661,13 @@ export default function ResourceDetail() {
     })();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Canonical permalink: upgrade a numeric / stale URL to the resource's slug.
+  useEffect(() => {
+    if (resource?.slug && id !== resource.slug) {
+      navigate(`/resources/${resource.slug}`, { replace: true });
+    }
+  }, [resource, id, navigate]);
+
   // Load progress: API first (if authenticated), then cookie/localStorage
   useEffect(() => {
     if (!id) return;

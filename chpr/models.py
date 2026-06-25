@@ -147,6 +147,10 @@ class Resource(models.Model):
 
     project = models.ForeignKey(Project, related_name="resources", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    slug = models.SlugField(
+        max_length=255, unique=True, null=True, blank=True,
+        help_text="URL permalink — auto-generated from the name if left blank.",
+    )
     type_key = models.CharField(max_length=20, choices=Type.choices, default=Type.JOB_AID)
     activity = models.CharField(max_length=2, choices=Activity.choices, default=Activity.HEALTH_FACILITY)
     audience = models.CharField(
@@ -182,6 +186,18 @@ class Resource(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            base = slugify(self.name)[:240] or "resource"
+            slug = base
+            n = 2
+            while Resource.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{n}"
+                n += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
     @property
     def is_pool_test(self):
