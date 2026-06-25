@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { fetchProjects, fetchResources } from "../api";
 import { availableTypeFilters, filterByType } from "../filters";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 import Pagination from "../components/Pagination";
+import BackLink from "../components/BackLink";
 
 const PAGE_SIZE = 12;
 
@@ -64,7 +65,7 @@ export default function AllResources() {
 
   return (
     <main className="main">
-      <Link to="/" className="back-link">← Back to Hub</Link>
+      <BackLink />
 
       <div className="section-header">
         <h2 className="section-title">All Resources</h2>

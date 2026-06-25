@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { fetchProjects } from "../api";
 import ProjectCard from "../components/ProjectCard";
+import BackLink from "../components/BackLink";
 
 export default function ProjectsIndex() {
   const [projects, setProjects] = useState([]);
@@ -21,7 +21,7 @@ export default function ProjectsIndex() {
 
   return (
     <main className="main">
-      <Link to="/" className="back-link">← Back to Hub</Link>
+      <BackLink />
 
       <div className="section-header">
         <div>

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { fetchProject, fetchResources } from "../api";
 import { availableTypeFilters, filterByType } from "../filters";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 import Pagination from "../components/Pagination";
+import BackLink from "../components/BackLink";
 
 const PAGE_SIZE = 12;
 
@@ -48,7 +49,7 @@ export default function Project() {
   if (projectError) {
     return (
       <main className="main">
-        <Link to="/" className="back-link">← Back to Hub</Link>
+        <BackLink />
         <div className="empty-state" style={{ marginTop: "1rem" }}><p>{projectError}</p></div>
       </main>
     );
@@ -57,7 +58,7 @@ export default function Project() {
   if (!project) {
     return (
       <main className="main">
-        <Link to="/" className="back-link">← Back to Hub</Link>
+        <BackLink />
         <p style={{ marginTop: "1rem" }}>Loading…</p>
       </main>
     );
@@ -72,17 +73,29 @@ export default function Project() {
 
   return (
     <main className="main">
-      <Link to="/" className="back-link">← Back to Hub</Link>
+      <BackLink />
 
-      <div className="project-hero">
+      <div className="project-hero" style={{ "--p-color": project.color, "--p-light": project.light_color }}>
+        <div className="project-hero-emblem">
+          {project.logo_url ? (
+            <img className="project-hero-logo" src={project.logo_url} alt={`${project.name} logo`} />
+          ) : (
+            <span className="project-hero-mark">
+              {(project.short_name || project.name).slice(0, 2).toUpperCase()}
+            </span>
+          )}
+        </div>
         <div className="project-hero-info">
+          <span className="project-hero-eyebrow">CHPR Programme</span>
           <h1>{project.name}</h1>
-          <p>{project.description}</p>
+          {project.description && <p>{project.description}</p>}
           <div className="project-hero-meta">
             <span className={`badge badge-${project.status === "completed" ? "completed" : "active"}`}>
               {project.status_display || project.status}
             </span>
-            <span className="badge badge-primary">CHPR</span>
+            <span className="project-hero-stat">
+              {project.resource_count} resource{project.resource_count !== 1 ? "s" : ""}
+            </span>
           </div>
         </div>
       </div>
