@@ -113,8 +113,10 @@ export default function Nav() {
   }, [menuOpen]);
 
   useEffect(() => {
+    // Projects are staff-only — don't fetch (or expose) them to guests.
+    if (!user) { setNavProjects([]); return; }
     fetchNavProjects().then(setNavProjects).catch(() => {});
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!projectsOpen) return;
@@ -164,6 +166,8 @@ export default function Nav() {
         <div className="nav-links">
           <Link to="/resources" className="nav-link">All Resources</Link>
 
+          {/* Projects are visible to logged-in staff only. */}
+          {user && (
           <div className="nav-projects-menu" ref={projectsRef}>
             <button
               type="button"
@@ -193,6 +197,7 @@ export default function Nav() {
               </Link>
             </div>
           </div>
+          )}
         </div>
 
         <div className="nav-search">
@@ -291,7 +296,7 @@ export default function Nav() {
         {mobileOpen && (
           <div className="nav-mobile-drawer">
             <Link to="/resources" className="nav-link" onClick={() => setMobileOpen(false)}>All Resources</Link>
-            {navProjects.length > 0 && (
+            {user && navProjects.length > 0 && (
               <>
                 <div className="nav-drawer-label">Projects</div>
                 {navProjects.map(p => (

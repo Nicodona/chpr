@@ -41,12 +41,28 @@ function AppInner() {
         <Route path="/"                element={<Home />} />
         <Route path="/resources"       element={<AllResources />} />
         <Route path="/resources/:id"   element={<ResourceDetail />} />
-        <Route path="/projects"        element={<ProjectsIndex />} />
-        <Route path="/projects/:slug"  element={<Project />} />
         <Route path="/login"           element={<Login />} />
         <Route path="/faq"             element={<FAQ />} />
 
         {/* ── Protected routes (any authenticated user) ── */}
+        {/* Projects are staff-only — guests are redirected to login. */}
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <ProjectsIndex />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:slug"
+          element={
+            <ProtectedRoute>
+              <Project />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/account/change-password"
           element={

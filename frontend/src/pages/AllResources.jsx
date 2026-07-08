@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchProjects, fetchResources } from "../api";
 import { availableTypeFilters, filterByType } from "../filters";
+import { useAuth } from "../context/AuthContext";
 import ResourceTile from "../components/ResourceTile";
 import Filters from "../components/Filters";
 import Pagination from "../components/Pagination";
@@ -10,6 +11,7 @@ import BackLink from "../components/BackLink";
 const PAGE_SIZE = 12;
 
 export default function AllResources() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [projects, setProjects] = useState([]);
   const [resources, setResources] = useState([]);
@@ -26,9 +28,11 @@ export default function AllResources() {
     [projects]
   );
 
+  // Projects are staff-only — only fetch them for logged-in users.
   useEffect(() => {
+    if (!user) { setProjects([]); return; }
     fetchProjects().then(setProjects).catch(console.error);
-  }, []);
+  }, [user]);
 
   // Fetch without the type filter so the type pills reflect what's available
   // and switching type is instant (client-side); re-fetch only on project/search.
@@ -72,7 +76,8 @@ export default function AllResources() {
       </div>
 
       <Filters options={typeFilters} value={type} onChange={(v) => setParam("type", v)} />
-      <Filters options={projectFilters} value={project} onChange={(v) => setParam("project", v)} />
+      {/* Project categories are staff-only. */}
+      {user && <Filters options={projectFilters} value={project} onChange={(v) => setParam("project", v)} />}
 
       <div className="resource-panel" ref={panelRef}>
         <div className="resource-panel-header">
@@ -106,7 +111,7 @@ export default function AllResources() {
           <>
             <div className="resources-grid">
               {shown.map((r) => (
-                <ResourceTile key={r.id} resource={r} />
+                <ResourceTile key={r.id} resource={r} showProject={!!user} />
               ))}
             </div>
             <Pagination page={page} pageCount={pageCount} onChange={goToPage} />

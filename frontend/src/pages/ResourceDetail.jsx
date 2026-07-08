@@ -799,7 +799,7 @@ export default function ResourceDetail() {
         <div className="rd-header-top">
           <div className="rd-header-tags">
             <span className={`res-type-badge ${typeClass}`}>{typeLabel}</span>
-            {project_slug && (
+            {user && project_slug && (
               <Link to={`/projects/${project_slug}`} className="rd-project-link">
                 {project_name}
               </Link>

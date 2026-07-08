@@ -35,7 +35,11 @@ export default function Home() {
     return user?.role === "admin" ? [...base, ADMIN_TILE] : base;
   }, [user, resources]);
 
-  useEffect(() => { fetchProjects().then(setProjects).catch(console.error); }, []);
+  // Projects are staff-only — only fetch them for logged-in users.
+  useEffect(() => {
+    if (!user) { setProjects([]); return; }
+    fetchProjects().then(setProjects).catch(console.error);
+  }, [user]);
   useEffect(() => {
     fetchSiteConfig().then((c) => setHomeCount(c.home_projects_count)).catch(() => {});
   }, []);
@@ -100,23 +104,28 @@ export default function Home() {
 
       {/* ── Main content ── */}
       <main className="main">
-        <div className="section-header">
-          <div>
-            <span className="section-eyebrow">Active programmes</span>
-            <h2 className="section-title">Projects</h2>
-          </div>
-          {projects.length > homeCount && (
-            <Link to="/projects" className="section-link">View all projects →</Link>
-          )}
-        </div>
+        {/* Projects are visible to logged-in staff only. */}
+        {user && (
+          <>
+            <div className="section-header">
+              <div>
+                <span className="section-eyebrow">Active programmes</span>
+                <h2 className="section-title">Projects</h2>
+              </div>
+              {projects.length > homeCount && (
+                <Link to="/projects" className="section-link">View all projects →</Link>
+              )}
+            </div>
 
-        <div className="projects-grid">
-          {projects.slice(0, homeCount).map((p) => (
-            <ProjectCard key={p.slug} project={p} />
-          ))}
-        </div>
+            <div className="projects-grid">
+              {projects.slice(0, homeCount).map((p) => (
+                <ProjectCard key={p.slug} project={p} />
+              ))}
+            </div>
 
-        <div className="divider" />
+            <div className="divider" />
+          </>
+        )}
 
         <div className="section-header">
           <div>
@@ -155,7 +164,7 @@ export default function Home() {
           ) : (
             <div className="resources-grid">
               {filtered.slice(0, 8).map(r => (
-                <ResourceTile key={r.id} resource={r} />
+                <ResourceTile key={r.id} resource={r} showProject={!!user} />
               ))}
             </div>
           )}
