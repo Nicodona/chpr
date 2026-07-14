@@ -561,16 +561,7 @@ function CommentSection({ resourceId, user }) {
     }
   }
 
-  if (!user) {
-    return (
-      <div className="rd-comments">
-        <h3 className="rd-section-title">Comments</h3>
-        <p className="rd-comment-guest">
-          Comments are available to registered users only. Please contact your administrator for access.
-        </p>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
     <div className="rd-comments">
@@ -765,7 +756,7 @@ export default function ResourceDetail() {
     );
   }
 
-  const { type_key, file_url, name, description, project_name, project_slug, posted_by, activity_label, test_platform, sample_type } = resource;
+  const { type_key, file_url, name, description, project_name, project_slug, posted_by, test_platform, sample_type } = resource;
   const typeLabel = resource.type_label || TYPE_LABELS[type_key] || type_key;
   const typeClass = TYPE_CLASS[type_key] || "";
 
@@ -834,11 +825,6 @@ export default function ResourceDetail() {
           {posted_by && (
             <span className="rd-meta-item">
               <strong>Posted by:</strong> {posted_by}
-            </span>
-          )}
-          {activity_label && (
-            <span className="rd-meta-item">
-              <strong>Setting:</strong> {activity_label}
             </span>
           )}
           {test_platform && (
@@ -955,11 +941,11 @@ export default function ResourceDetail() {
       </div>
 
       {/* Comments */}
-      <CommentSection resourceId={id} user={user} />
+      <CommentSection resourceId={resource.id} user={user} />
 
       {/* Quiz modal */}
       {quizOpen && (
-        <QuizModal resourceId={id} onClose={() => setQuizOpen(false)} />
+        <QuizModal resourceId={resource.id} onClose={() => setQuizOpen(false)} />
       )}
     </main>
   );

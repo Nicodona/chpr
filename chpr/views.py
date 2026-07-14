@@ -362,7 +362,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
 class ResourceCommentViewSet(viewsets.ModelViewSet):
     """
-    Comments. Filter by ?resource=<id>.
+    Comments. Filter by ?resource=<id or slug>.
     Read operations are public; writes require login.
     """
     queryset = ResourceComment.objects.all()
@@ -374,7 +374,7 @@ class ResourceCommentViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         resource = self.request.query_params.get("resource")
         if resource:
-            qs = qs.filter(resource_id=resource)
+            qs = qs.filter(resource_id=resource) if resource.isdigit() else qs.filter(resource__slug=resource)
         return qs
 
 
@@ -493,7 +493,7 @@ class ListUsersView(APIView):
 class QuizQuestionViewSet(viewsets.ModelViewSet):
     """
     CRUD for quiz questions.
-    Filter by ?resource=<id>.
+    Filter by ?resource=<id or slug>.
     Read operations are public; writes are admin-only.
     """
     queryset = QuizQuestion.objects.all()
@@ -504,7 +504,7 @@ class QuizQuestionViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         resource = self.request.query_params.get("resource")
         if resource:
-            qs = qs.filter(resource_id=resource)
+            qs = qs.filter(resource_id=resource) if resource.isdigit() else qs.filter(resource__slug=resource)
         return qs
 
     def get_serializer_class(self):
