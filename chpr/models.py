@@ -237,6 +237,56 @@ class ResourceFile(models.Model):
         return f"{self.resource_id} [{self.language}]"
 
 
+class ResourceHTML(models.Model):
+    """The web-reader version of an uploaded PDF/DOCX file.
+
+    One row per ``ResourceFile`` (language variant); rows with
+    ``resource_file = NULL`` belong to the legacy ``Resource.file`` upload.
+    Populated automatically on upload (signals) or lazily on first request —
+    see ``doc_convert``. Images are embedded as data URIs so ``html`` is
+    fully self-contained.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+
+    resource = models.ForeignKey(Resource, related_name="html_docs", on_delete=models.CASCADE)
+    resource_file = models.OneToOneField(
+        ResourceFile, related_name="html_doc", on_delete=models.CASCADE,
+        null=True, blank=True,
+        help_text="Language file this HTML was converted from; empty = legacy Resource.file.",
+    )
+    language = models.CharField(max_length=5, blank=True, default="")
+    source_name = models.CharField(
+        max_length=500, blank=True,
+        help_text="Storage name of the file that was converted — used to detect stale HTML.",
+    )
+    html = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    error = models.CharField(max_length=500, blank=True)
+    page_count = models.PositiveIntegerField(default=0)
+    word_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Resource web version"
+        verbose_name_plural = "Resource web versions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["resource"],
+                condition=models.Q(resource_file__isnull=True),
+                name="uniq_legacy_html_per_resource",
+            ),
+        ]
+
+    def __str__(self):
+        lang = f" [{self.language}]" if self.language else ""
+        return f"HTML for resource {self.resource_id}{lang} ({self.status})"
+
+
 class ResourceComment(models.Model):
     """A staff comment on a resource (open thread in the mockup)."""
 
@@ -275,20 +325,44 @@ class ContactMessage(models.Model):
 
 
 class QuizQuestion(models.Model):
-    """MCQ question for a resource's 'Test your understanding' quiz."""
+    """A question for a resource's 'Test your understanding' quiz.
+
+    Two kinds:
+      - ``mcq``   : classic A–D multiple choice (``correct`` holds the letter).
+      - ``short`` : straight/short answer typed by the user; graded against
+                    ``answer_text`` (case/punctuation-insensitive, fuzzy).
+
+    Questions are auto-generated from the converted document text when a
+    PDF/DOCX resource is uploaded (see ``quiz_gen``); admins can edit or
+    replace them in the Django admin or the Manage panel. Auto-generated
+    rows are flagged so regeneration never destroys hand-written questions.
+    """
 
     OPTION_CHOICES = [("a", "A"), ("b", "B"), ("c", "C"), ("d", "D")]
+
+    class QType(models.TextChoices):
+        MCQ = "mcq", "Multiple choice"
+        SHORT = "short", "Short answer"
 
     resource = models.ForeignKey(
         Resource, on_delete=models.CASCADE, related_name="quiz_questions"
     )
     question = models.TextField()
-    option_a = models.CharField(max_length=500)
-    option_b = models.CharField(max_length=500)
-    option_c = models.CharField(max_length=500)
-    option_d = models.CharField(max_length=500)
-    correct = models.CharField(max_length=1, choices=OPTION_CHOICES)
+    question_type = models.CharField(max_length=6, choices=QType.choices, default=QType.MCQ)
+    option_a = models.CharField(max_length=500, blank=True)
+    option_b = models.CharField(max_length=500, blank=True)
+    option_c = models.CharField(max_length=500, blank=True)
+    option_d = models.CharField(max_length=500, blank=True)
+    correct = models.CharField(max_length=1, choices=OPTION_CHOICES, default="a")
+    answer_text = models.CharField(
+        max_length=500, blank=True,
+        help_text="Expected answer for short-answer questions (graded case-insensitively).",
+    )
     explanation = models.TextField(blank=True)
+    auto_generated = models.BooleanField(
+        default=False,
+        help_text="Created by the quiz generator; replaced when the quiz is regenerated.",
+    )
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

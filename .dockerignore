@@ -5,6 +5,7 @@
 *.env
 deploy/.env
 _legacy/
+.venv/
 **/node_modules
 frontend/dist
 build

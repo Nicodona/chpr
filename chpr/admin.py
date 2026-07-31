@@ -1,7 +1,7 @@
 """Django admin registrations for the CHPR Resources Hub."""
 from django.contrib import admin
 
-from .models import FAQ, ContactMessage, Project, Resource, ResourceComment, ResourceFile, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, ResourceHTML, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
 
 
 @admin.register(StaffProfile)
@@ -54,9 +54,30 @@ class ResourceFileInline(admin.TabularInline):
     fields = ("language", "file", "order")
 
 
+class QuizQuestionInline(admin.StackedInline):
+    model = QuizQuestion
+    extra = 0
+    classes = ("collapse",)
+    fields = (
+        ("question_type", "order", "auto_generated"),
+        "question",
+        ("option_a", "option_b"),
+        ("option_c", "option_d"),
+        ("correct", "answer_text"),
+        "explanation",
+    )
+
+
 @admin.register(Resource)
 class ResourceAdmin(admin.ModelAdmin):
-    inlines = [ResourceFileInline]
+    inlines = [ResourceFileInline, QuizQuestionInline]
+    actions = ("regenerate_quiz",)
+
+    @admin.action(description="Regenerate quiz from document (keeps hand-written questions)")
+    def regenerate_quiz(self, request, queryset):
+        from . import quiz_gen
+        made = sum(quiz_gen.generate_for_resource(r, replace_auto=True) for r in queryset)
+        self.message_user(request, f"Generated {made} question(s) across {queryset.count()} resource(s).")
     list_display = ("name", "project", "type_key", "activity", "audience", "is_pool_test", "created_at")
     list_filter = ("type_key", "activity", "audience", "project")
     search_fields = ("name", "description", "posted_by")
@@ -75,6 +96,67 @@ class ResourceAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Pool test")
     def is_pool_test(self, obj):
         return obj.is_pool_test
+
+
+@admin.register(ResourceHTML)
+class ResourceHTMLAdmin(admin.ModelAdmin):
+    """Converted web versions of PDF/DOCX uploads (read-mostly; use the
+    action to force a re-conversion after a library upgrade or fix)."""
+    list_display = ("resource", "language", "status", "page_count", "word_count", "updated_at")
+    list_filter = ("status", "language")
+    search_fields = ("resource__name", "source_name", "error")
+    readonly_fields = ("resource", "resource_file", "language", "source_name",
+                       "status", "error", "page_count", "word_count",
+                       "created_at", "updated_at")
+    exclude = ("html",)
+    actions = ("reconvert",)
+
+    @admin.action(description="Re-convert selected documents")
+    def reconvert(self, request, queryset):
+        from . import doc_convert
+        done = 0
+        for row in queryset.select_related("resource", "resource_file"):
+            if row.resource_file:
+                doc_convert.refresh_for_resource_file(row.resource_file, force=True)
+            else:
+                doc_convert.refresh_for_legacy_file(row.resource, force=True)
+            done += 1
+        self.message_user(request, f"Re-converted {done} document(s).")
+
+    def has_add_permission(self, request):
+        return False  # rows are created by the conversion pipeline
+
+
+@admin.register(QuizQuestion)
+class QuizQuestionAdmin(admin.ModelAdmin):
+    """Edit auto-generated or hand-written quiz questions.
+    Un-tick 'auto generated' on a question you've rewritten so a quiz
+    regeneration never deletes it."""
+    list_display = ("question_short", "resource", "question_type", "correct_display",
+                    "auto_generated", "order")
+    list_filter = ("question_type", "auto_generated", "resource__project")
+    search_fields = ("question", "resource__name", "answer_text")
+    autocomplete_fields = ("resource",)
+    list_editable = ("order",)
+    fields = (
+        "resource",
+        ("question_type", "order", "auto_generated"),
+        "question",
+        ("option_a", "option_b"),
+        ("option_c", "option_d"),
+        ("correct", "answer_text"),
+        "explanation",
+    )
+
+    @admin.display(description="Question")
+    def question_short(self, obj):
+        return obj.question[:80]
+
+    @admin.display(description="Answer")
+    def correct_display(self, obj):
+        if obj.question_type == QuizQuestion.QType.SHORT:
+            return obj.answer_text[:40]
+        return obj.correct.upper()
 
 
 @admin.register(ResourceComment)

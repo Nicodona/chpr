@@ -4902,3 +4902,179 @@ body { background: var(--page-bg); }
 }
 .rd-lang-pick-hint { font-size: 12px; color: var(--muted-2, #94a3b8); }
 .rd-lang-pick .rd-lang-switch { margin: 0; display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Web (HTML) document reader ─────────────────────────────────────────────
+   Converted PDF/DOCX rendered as a styled article inside .rd-reader-box. */
+.rd-reader-header-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rd-viewtoggle-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.82rem; font-weight: 700; color: var(--slate);
+  border: 1px solid var(--border); background: #fff;
+  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+}
+.rd-viewtoggle-btn:hover { border-color: var(--slate); background: var(--slate-light); }
+.rd-webver-badge {
+  display: inline-block; margin-left: 10px; padding: 2px 9px; vertical-align: 2px;
+  font-family: 'DM Sans', sans-serif; font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--teal); background: var(--teal-light);
+  border: 1px solid rgba(15,110,86,0.25); border-radius: 99px;
+}
+
+.rd-htmldoc {
+  max-width: 780px; margin: 1.25rem auto; padding: 2.25rem 2.5rem 3rem;
+  background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+  font-size: 1rem; line-height: 1.75; color: var(--dark);
+  overflow-wrap: break-word;
+}
+.rd-htmldoc h1, .rd-htmldoc h2, .rd-htmldoc h3,
+.rd-htmldoc h4, .rd-htmldoc h5, .rd-htmldoc h6 {
+  font-family: 'Sora', sans-serif; color: var(--dark);
+  line-height: 1.3; margin: 1.9rem 0 0.75rem;
+}
+.rd-htmldoc h1 { font-size: 1.55rem; }
+.rd-htmldoc h2 { font-size: 1.3rem; }
+.rd-htmldoc h3 { font-size: 1.12rem; }
+.rd-htmldoc h4, .rd-htmldoc h5, .rd-htmldoc h6 { font-size: 1rem; }
+.rd-htmldoc > :first-child { margin-top: 0; }
+.rd-htmldoc p { margin: 0 0 1rem; }
+.rd-htmldoc ul, .rd-htmldoc ol { margin: 0 0 1rem; padding-left: 1.5rem; }
+.rd-htmldoc li { margin: 0.35rem 0; }
+.rd-htmldoc li > ul, .rd-htmldoc li > ol { margin-bottom: 0; }
+.rd-htmldoc img {
+  display: block; max-width: 100%; height: auto; margin: 1.25rem auto;
+  border-radius: 6px; box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+}
+.rd-htmldoc table {
+  display: block; overflow-x: auto; border-collapse: collapse;
+  margin: 1.25rem 0; font-size: 0.92rem;
+}
+.rd-htmldoc th, .rd-htmldoc td {
+  border: 1px solid var(--border); padding: 8px 12px; text-align: left;
+  vertical-align: top;
+}
+.rd-htmldoc th { background: var(--primary-light); font-weight: 600; }
+.rd-htmldoc tr:nth-child(even) td { background: var(--bg); }
+.rd-htmldoc blockquote {
+  margin: 1.25rem 0; padding: 0.35rem 1.1rem;
+  border-left: 3px solid var(--primary); color: var(--muted);
+}
+.rd-htmldoc code {
+  background: var(--slate-light); padding: 2px 6px; border-radius: 4px;
+  font-size: 0.88em;
+}
+.rd-htmldoc pre {
+  background: var(--dark); color: #f1f5f9; padding: 1rem 1.25rem;
+  border-radius: 8px; overflow-x: auto; margin: 1.25rem 0;
+}
+.rd-htmldoc pre code { background: none; padding: 0; color: inherit; }
+.rd-htmldoc hr { border: none; border-top: 1px dashed var(--border); margin: 2rem 0; }
+.rd-htmldoc a { color: var(--primary); }
+.rd-htmldoc sup { font-size: 0.72em; }
+
+@media (max-width: 640px) {
+  .rd-htmldoc { margin: 0.75rem; padding: 1.4rem 1.1rem 2rem; font-size: 0.95rem; }
+}
+
+/* ── Web reader: wider desktop layout ───────────────────────────────────────
+   Job aids read better with room for diagrams/tables on computer screens. */
+@media (min-width: 1100px) {
+  .rd-main { max-width: 1140px; }
+  .rd-reader-box { max-height: calc(100vh - 150px); }
+  .rd-htmldoc {
+    max-width: 1000px; padding: 2.75rem 3.5rem 3.5rem;
+    font-size: 1.05rem;
+  }
+}
+
+/* ── Section chips in the header card (jump into the web version) ─────────── */
+.rd-sections {
+  display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 10px;
+  margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--border);
+}
+.rd-sections-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); padding-top: 6px;
+}
+.rd-section-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.rd-section-chip {
+  font-family: inherit; font-size: 0.78rem; font-weight: 600; line-height: 1.3;
+  color: var(--slate); background: var(--slate-light);
+  border: 1px solid transparent; border-radius: 99px;
+  padding: 5px 13px; cursor: pointer; text-align: left;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rd-section-chip:hover { border-color: var(--slate); }
+.rd-section-chip-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.rd-section-chip-sub { font-weight: 500; opacity: 0.9; }
+
+/* ── In-document search toolbar (sticky above the article) ────────────────── */
+.rd-docsearch {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  background: rgba(245, 247, 250, 0.92);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  border-bottom: 1px solid var(--border);
+}
+.rd-docsearch-icon { color: var(--muted); flex: none; }
+.rd-docsearch-input {
+  flex: 0 1 340px; min-width: 140px;
+  font-family: inherit; font-size: 0.88rem; color: var(--dark);
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 12px; outline: none;
+}
+.rd-docsearch-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.rd-docsearch-count { font-size: 0.78rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.rd-docsearch-nav { display: inline-flex; gap: 4px; }
+.rd-docsearch-nav button, .rd-docsearch-clear {
+  font-family: inherit; font-size: 0.85rem; font-weight: 700; line-height: 1;
+  color: var(--slate); background: #fff; border: 1px solid var(--border);
+  border-radius: 7px; width: 28px; height: 28px; cursor: pointer;
+}
+.rd-docsearch-nav button:hover, .rd-docsearch-clear:hover {
+  border-color: var(--slate); background: var(--slate-light);
+}
+.rd-docsearch-clear { font-size: 1rem; }
+
+/* Match highlights inside the article */
+.rd-htmldoc mark.rd-doc-hl {
+  background: #ffe58a; color: inherit; padding: 0 1px; border-radius: 2px;
+}
+.rd-htmldoc mark.rd-doc-hl-current {
+  background: #f59e0b; color: #fff;
+}
+
+/* Jump targets clear the sticky search bar when scrolled to */
+.rd-htmldoc [id^="rdsec-"] { scroll-margin-top: 64px; }
+
+@media (max-width: 640px) {
+  .rd-docsearch { padding: 8px 10px; }
+  .rd-docsearch-input { flex: 1 1 auto; }
+}
+
+/* ── Quiz: short/straight-answer questions ─────────────────────────────────── */
+.rd-quiz-question { white-space: pre-line; }
+.rd-quiz-short { margin: 0.5rem 0 1rem; }
+.rd-quiz-short-input {
+  width: 100%; font-family: inherit; font-size: 1rem; color: var(--dark);
+  background: #fff; border: 2px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; outline: none;
+}
+.rd-quiz-short-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.rd-quiz-short-hint { margin: 6px 2px 0; font-size: 0.78rem; color: var(--muted); }
+
+/* Manage panel: auto-generated question badge */
+.mp-quiz-auto-badge {
+  display: inline-block; margin-left: 8px; padding: 1px 8px; vertical-align: 1px;
+  font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--amber); background: var(--amber-light);
+  border-radius: 99px;
+}
+
+/* Quiz: one-time source note at the top of the modal */
+.rd-quiz-source-note {
+  margin: 0.6rem 0 0.2rem; padding: 8px 12px;
+  font-size: 0.8rem; color: var(--teal);
+  background: var(--teal-light); border-radius: 8px;
+}

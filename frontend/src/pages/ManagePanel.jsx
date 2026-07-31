@@ -92,7 +92,7 @@ function StatCard({ num, label, color }) {
 }
 
 // ── Quiz editor (inline per-resource) ────────────────────────────────────────
-const EMPTY_Q_FORM = { question:"", option_a:"", option_b:"", option_c:"", option_d:"", correct:"a", explanation:"", order:0 };
+const EMPTY_Q_FORM = { question:"", question_type:"mcq", option_a:"", option_b:"", option_c:"", option_d:"", correct:"a", answer_text:"", explanation:"", order:0 };
 
 function QuizEditor({ resourceId }) {
   const [questions, setQuestions] = useState([]);
@@ -100,6 +100,7 @@ function QuizEditor({ resourceId }) {
   const [adding,    setAdding]    = useState(false);
   const [form,      setForm]      = useState(EMPTY_Q_FORM);
   const [saving,    setSaving]    = useState(false);
+  const [genBusy,   setGenBusy]   = useState(false);
   const [err,       setErr]       = useState("");
 
   const loadQs = useCallback(async () => {
@@ -115,7 +116,10 @@ function QuizEditor({ resourceId }) {
 
   async function handleAdd(e) {
     e.preventDefault();
-    if (!form.question.trim() || !form.option_a.trim() || !form.option_b.trim()) {
+    if (!form.question.trim()) { setErr("Question text is required."); return; }
+    if (form.question_type === "short") {
+      if (!form.answer_text.trim()) { setErr("Short-answer questions need the expected answer."); return; }
+    } else if (!form.option_a.trim() || !form.option_b.trim()) {
       setErr("Question, Option A and Option B are required.");
       return;
     }
@@ -135,29 +139,62 @@ function QuizEditor({ resourceId }) {
     catch (e) { alert("Delete failed: " + e.message); }
   }
 
+  async function handleAutoGenerate() {
+    const hasAuto = questions.some(q => q.auto_generated);
+    const msg = hasAuto
+      ? "Regenerate the quiz from the document? Auto-generated questions are replaced; questions you wrote yourself are kept."
+      : "Generate quiz questions automatically from this resource's document?";
+    if (!window.confirm(msg)) return;
+    setGenBusy(true); setErr("");
+    try {
+      const res = await authedPost(`/api/resources/${resourceId}/generate-quiz/`, {});
+      await loadQs();
+      if (res?.created === 0) setErr("Nothing generated — the document may have no readable text.");
+    } catch (e) { setErr(e.message || "Generation failed."); }
+    finally { setGenBusy(false); }
+  }
+
   return (
     <div className="mp-quiz-editor">
       <div className="mp-quiz-editor-hd">
         <span className="mp-quiz-count">{questions.length} quiz question{questions.length !== 1 ? "s" : ""}</span>
-        <button className="mp-btn mp-btn-edit" onClick={() => { setAdding(a => !a); setErr(""); }}>
-          {adding ? "Cancel" : "+ Add question"}
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="mp-btn mp-btn-edit" onClick={handleAutoGenerate} disabled={genBusy}
+            title="Build questions automatically from the document's text">
+            {genBusy ? "Generating…" : "⚡ Auto-generate from document"}
+          </button>
+          <button className="mp-btn mp-btn-edit" onClick={() => { setAdding(a => !a); setErr(""); }}>
+            {adding ? "Cancel" : "+ Add question"}
+          </button>
+        </div>
       </div>
 
+      {err && !adding && <div className="field-error" style={{display:"block",margin:"0.5rem 0"}}>{err}</div>}
       {loading && <p className="mp-loading">Loading questions…</p>}
 
       {!loading && questions.map((q, i) => (
         <div key={q.id} className="mp-quiz-q-row">
           <span className="mp-quiz-q-num">{i + 1}</span>
           <div className="mp-quiz-q-main">
-            <span className="mp-quiz-q-text">{q.question}</span>
-            <div className="mp-quiz-q-opts">
-              {["a","b","c","d"].filter(k => q[`option_${k}`]).map(k => (
-                <span key={k} className={`mp-quiz-q-opt ${q.correct === k ? "correct" : ""}`}>
-                  <strong>{k.toUpperCase()}.</strong> {q[`option_${k}`]}{q.correct === k ? " ✓" : ""}
+            <span className="mp-quiz-q-text">
+              {q.question}
+              {q.auto_generated && <span className="mp-quiz-auto-badge" title="Created by the quiz generator — replaced on regenerate">auto</span>}
+            </span>
+            {q.question_type === "short" ? (
+              <div className="mp-quiz-q-opts">
+                <span className="mp-quiz-q-opt correct">
+                  <strong>Answer:</strong> {q.answer_text} ✓ <em>(typed answer)</em>
                 </span>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="mp-quiz-q-opts">
+                {["a","b","c","d"].filter(k => q[`option_${k}`]).map(k => (
+                  <span key={k} className={`mp-quiz-q-opt ${q.correct === k ? "correct" : ""}`}>
+                    <strong>{k.toUpperCase()}.</strong> {q[`option_${k}`]}{q.correct === k ? " ✓" : ""}
+                  </span>
+                ))}
+              </div>
+            )}
             {q.explanation && <span className="mp-quiz-q-exp">💡 {q.explanation}</span>}
           </div>
           <button className="mp-btn mp-btn-delete" onClick={() => handleDelete(q.id)}>Delete</button>
@@ -169,32 +206,52 @@ function QuizEditor({ resourceId }) {
           <h4 className="mp-quiz-form-title">New question</h4>
           {err && <div className="field-error" style={{display:"block",marginBottom:"0.5rem"}}>{err}</div>}
 
-          <div className="field">
-            <label className="field-label">Question <span className="field-required">*</span></label>
-            <textarea className="field-textarea" rows={2} value={form.question}
-              onChange={e => setForm(f=>({...f, question: e.target.value}))} required />
-          </div>
           <div className="field-row-2">
-            <div className="field"><label className="field-label">Option A <span className="field-required">*</span></label>
-              <input className="field-input" value={form.option_a} onChange={e => setForm(f=>({...f,option_a:e.target.value}))} required /></div>
-            <div className="field"><label className="field-label">Option B <span className="field-required">*</span></label>
-              <input className="field-input" value={form.option_b} onChange={e => setForm(f=>({...f,option_b:e.target.value}))} required /></div>
-          </div>
-          <div className="field-row-2">
-            <div className="field"><label className="field-label">Option C</label>
-              <input className="field-input" value={form.option_c} onChange={e => setForm(f=>({...f,option_c:e.target.value}))} /></div>
-            <div className="field"><label className="field-label">Option D</label>
-              <input className="field-input" value={form.option_d} onChange={e => setForm(f=>({...f,option_d:e.target.value}))} /></div>
-          </div>
-          <div className="field-row-2">
-            <div className="field"><label className="field-label">Correct answer <span className="field-required">*</span></label>
-              <select className="field-select" value={form.correct} onChange={e => setForm(f=>({...f,correct:e.target.value}))}>
-                {["a","b","c","d"].map(k => <option key={k} value={k}>{k.toUpperCase()}</option>)}
+            <div className="field"><label className="field-label">Question type</label>
+              <select className="field-select" value={form.question_type}
+                onChange={e => setForm(f=>({...f,question_type:e.target.value}))}>
+                <option value="mcq">Multiple choice (A–D)</option>
+                <option value="short">Short / straight answer</option>
               </select></div>
             <div className="field"><label className="field-label">Order</label>
               <input className="field-input" type="number" min={0} value={form.order}
                 onChange={e => setForm(f=>({...f,order:parseInt(e.target.value)||0}))} /></div>
           </div>
+          <div className="field">
+            <label className="field-label">Question <span className="field-required">*</span></label>
+            <textarea className="field-textarea" rows={2} value={form.question}
+              onChange={e => setForm(f=>({...f, question: e.target.value}))} required />
+          </div>
+          {form.question_type === "short" ? (
+            <div className="field">
+              <label className="field-label">Expected answer <span className="field-required">*</span></label>
+              <input className="field-input" value={form.answer_text}
+                onChange={e => setForm(f=>({...f,answer_text:e.target.value}))}
+                placeholder="Graded case-insensitively; small typos tolerated" />
+            </div>
+          ) : (
+            <>
+              <div className="field-row-2">
+                <div className="field"><label className="field-label">Option A <span className="field-required">*</span></label>
+                  <input className="field-input" value={form.option_a} onChange={e => setForm(f=>({...f,option_a:e.target.value}))} /></div>
+                <div className="field"><label className="field-label">Option B <span className="field-required">*</span></label>
+                  <input className="field-input" value={form.option_b} onChange={e => setForm(f=>({...f,option_b:e.target.value}))} /></div>
+              </div>
+              <div className="field-row-2">
+                <div className="field"><label className="field-label">Option C</label>
+                  <input className="field-input" value={form.option_c} onChange={e => setForm(f=>({...f,option_c:e.target.value}))} /></div>
+                <div className="field"><label className="field-label">Option D</label>
+                  <input className="field-input" value={form.option_d} onChange={e => setForm(f=>({...f,option_d:e.target.value}))} /></div>
+              </div>
+              <div className="field-row-2">
+                <div className="field"><label className="field-label">Correct answer <span className="field-required">*</span></label>
+                  <select className="field-select" value={form.correct} onChange={e => setForm(f=>({...f,correct:e.target.value}))}>
+                    {["a","b","c","d"].map(k => <option key={k} value={k}>{k.toUpperCase()}</option>)}
+                  </select></div>
+                <div className="field" />
+              </div>
+            </>
+          )}
           <div className="field">
             <label className="field-label">Explanation (optional)</label>
             <textarea className="field-textarea" rows={2} value={form.explanation}

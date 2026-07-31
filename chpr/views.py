@@ -21,7 +21,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
+from . import doc_convert, quiz_gen
+from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceHTML, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
 from .serializers import (
     ChangePasswordSerializer,
     ContactMessageSerializer,
@@ -39,6 +40,29 @@ from .serializers import (
 
 # Shared authentication backends used on all views that need auth.
 AUTH_BACKENDS = [SessionAuthentication, TokenAuthentication]
+
+
+def _short_answer_matches(given, expected):
+    """Forgiving comparison for typed quiz answers: case, punctuation and
+    spacing never count against the user; tiny typos are tolerated."""
+    import difflib
+    import re as _re
+
+    if not given or not expected:
+        return False
+
+    def norm(s):
+        return _re.sub(r"[^a-z0-9]+", " ", str(s).lower()).strip()
+
+    a, b = norm(given), norm(expected)
+    if not a:
+        return False
+    if a == b:
+        return True
+    # Numbers must match exactly once normalized; words may be near-misses.
+    if b.replace(" ", "").isdigit():
+        return a.replace(" ", "") == b.replace(" ", "")
+    return difflib.SequenceMatcher(None, a, b).ratio() >= 0.85
 
 
 def _is_admin(user):
@@ -255,6 +279,74 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True,
+        methods=["get"],
+        url_path="html",
+        permission_classes=[AllowAny],
+        authentication_classes=AUTH_BACKENDS,
+    )
+    def html(self, request, pk=None):
+        """
+        GET /api/resources/<id-or-slug>/html/?lang=<en|fr|pcm|ful>
+        Returns the stored web (HTML) version of the resource's PDF/DOCX file,
+        converting it on demand the first time it is requested (so resources
+        uploaded before this feature existed work too).
+
+        Response: { status: ready|failed|unavailable, html, language,
+                    page_count, word_count, error }
+        """
+        resource = self.get_object()
+        lang = request.query_params.get("lang") or None
+        try:
+            doc = doc_convert.get_or_convert(resource, lang)
+        except Exception:  # pragma: no cover — belt & braces around lazy convert
+            doc = None
+        if doc is None:
+            return Response(
+                {"status": "unavailable", "html": "", "error": "No convertible document."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        ready = doc.status == ResourceHTML.Status.READY
+        if ready:
+            # Resources converted lazily (pre-feature uploads) also get their
+            # quiz on first view.
+            quiz_gen.maybe_autogenerate(resource)
+        return Response({
+            "status": doc.status,
+            "html": doc.html if ready else "",
+            "language": doc.language,
+            "page_count": doc.page_count,
+            "word_count": doc.word_count,
+            "error": "" if ready else doc.error,
+            "converted_at": doc.updated_at,
+        })
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="generate-quiz",
+        permission_classes=[IsAuthenticated],
+        authentication_classes=AUTH_BACKENDS,
+    )
+    def generate_quiz(self, request, pk=None):
+        """
+        POST /api/resources/<id>/generate-quiz/   (admin only)
+        Regenerates the auto-generated quiz questions from the converted
+        document. Hand-written questions are never touched.
+        """
+        if not _is_admin(request.user):
+            return Response({"detail": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
+        resource = self.get_object()
+        created = quiz_gen.generate_for_resource(resource, replace_auto=True)
+        if created == 0 and not resource.quiz_questions.exists():
+            return Response(
+                {"created": 0, "detail": "No readable document to generate questions from. "
+                                         "Upload a PDF/DOCX (and open it once) first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"created": created, "total": resource.quiz_questions.count()})
+
+    @action(
+        detail=True,
         methods=["post"],
         url_path="submit-quiz",
         permission_classes=[IsAuthenticated],
@@ -279,12 +371,16 @@ class ResourceViewSet(viewsets.ModelViewSet):
         for q in questions:
             q_id = str(q.id)
             your_answer = answers.get(q_id, None)
-            is_correct = your_answer == q.correct
+            if q.question_type == QuizQuestion.QType.SHORT:
+                is_correct = _short_answer_matches(your_answer, q.answer_text)
+            else:
+                is_correct = your_answer == q.correct
             if is_correct:
                 score += 1
             results.append({
                 "id": q.id,
                 "question": q.question,
+                "question_type": q.question_type,
                 "options": {
                     "a": q.option_a,
                     "b": q.option_b,
@@ -292,7 +388,8 @@ class ResourceViewSet(viewsets.ModelViewSet):
                     "d": q.option_d,
                 },
                 "your_answer": your_answer,
-                "correct": q.correct,
+                "correct": q.correct if q.question_type == QuizQuestion.QType.MCQ else None,
+                "correct_text": q.answer_text if q.question_type == QuizQuestion.QType.SHORT else None,
                 "is_correct": is_correct,
                 "explanation": q.explanation,
             })

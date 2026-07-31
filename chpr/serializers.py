@@ -234,19 +234,35 @@ class QuizQuestionAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizQuestion
         fields = [
-            "id", "resource", "question",
+            "id", "resource", "question", "question_type",
             "option_a", "option_b", "option_c", "option_d",
-            "correct", "explanation", "order",
+            "correct", "answer_text", "explanation", "auto_generated", "order",
         ]
+
+    def validate(self, attrs):
+        qtype = attrs.get("question_type", getattr(self.instance, "question_type", "mcq"))
+        if qtype == QuizQuestion.QType.SHORT:
+            if not (attrs.get("answer_text") or getattr(self.instance, "answer_text", "")):
+                raise serializers.ValidationError(
+                    {"answer_text": "Short-answer questions need the expected answer."}
+                )
+        else:
+            a = attrs.get("option_a", getattr(self.instance, "option_a", ""))
+            b = attrs.get("option_b", getattr(self.instance, "option_b", ""))
+            if not (a and b):
+                raise serializers.ValidationError(
+                    {"option_a": "Multiple-choice questions need at least options A and B."}
+                )
+        return attrs
 
 
 class QuizQuestionPublicSerializer(serializers.ModelSerializer):
-    """Public serializer — omits correct answer and explanation."""
+    """Public serializer — omits the correct answer(s) and explanation."""
 
     class Meta:
         model = QuizQuestion
         fields = [
-            "id", "resource", "question",
+            "id", "resource", "question", "question_type",
             "option_a", "option_b", "option_c", "option_d",
             "order",
         ]

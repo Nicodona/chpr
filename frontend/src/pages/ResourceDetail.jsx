@@ -134,6 +134,271 @@ function getPdfJs() {
   return _pdfJsPromise;
 }
 
+// ── In-document search helpers (plain DOM — the article is static HTML) ──────
+const MAX_MATCHES = 400;
+
+function clearDocHighlights(root) {
+  root.querySelectorAll("mark.rd-doc-hl").forEach((mark) => {
+    const parent = mark.parentNode;
+    parent.replaceChild(document.createTextNode(mark.textContent), mark);
+    parent.normalize(); // merge split text nodes so repeat searches work
+  });
+}
+
+function highlightDocMatches(root, query) {
+  const q = query.toLowerCase();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+  const marks = [];
+  for (const node of textNodes) {
+    if (marks.length >= MAX_MATCHES) break;
+    const text = node.nodeValue;
+    const lower = text.toLowerCase();
+    let idx = lower.indexOf(q);
+    if (idx === -1) continue;
+
+    const frag = document.createDocumentFragment();
+    let last = 0;
+    while (idx !== -1 && marks.length < MAX_MATCHES) {
+      frag.appendChild(document.createTextNode(text.slice(last, idx)));
+      const mark = document.createElement("mark");
+      mark.className = "rd-doc-hl";
+      mark.textContent = text.slice(idx, idx + q.length);
+      frag.appendChild(mark);
+      marks.push(mark);
+      last = idx + q.length;
+      idx = lower.indexOf(q, last);
+    }
+    frag.appendChild(document.createTextNode(text.slice(last)));
+    node.parentNode.replaceChild(frag, node);
+  }
+  return marks;
+}
+
+// ── HtmlDocReader ─────────────────────────────────────────────────────────────
+// Renders the backend-converted web (HTML) version of a PDF/DOCX resource and
+// reports reading progress from how far the user has scrolled the article.
+// Also extracts the document outline (headings) for the parent's section
+// chips, tracks the section currently in view, and offers keyword search
+// with highlight + prev/next navigation.
+// If the backend has no usable conversion, onUnavailable() lets the parent
+// fall back to the original-file viewer.
+function HtmlDocReader({
+  resourceId, lang, onProgress, onReady, onUnavailable, onOutline, onActiveSection,
+}) {
+  const [html, setHtml] = useState("");
+  const [loading, setLoading] = useState(true);
+  const articleRef = useRef(null);
+  const maxPctRef = useRef(0);
+  const headingElsRef = useRef([]);
+  const activeSecRef = useRef(null);
+
+  // Search state
+  const [query, setQuery] = useState("");
+  const [matchCount, setMatchCount] = useState(0);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const marksRef = useRef([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const qs = lang ? `?lang=${encodeURIComponent(lang)}` : "";
+        const token = getToken(); // staff-only resources need auth to resolve
+        const res = await fetch(`${BASE}/api/resources/${resourceId}/html/${qs}`, {
+          headers: token ? { Authorization: `Token ${token}` } : {},
+          credentials: "include",
+        });
+        const data = res.ok ? await res.json() : null;
+        if (cancelled) return;
+        if (data?.status === "ready" && data.html) {
+          setHtml(data.html);
+          onReady?.();
+        } else {
+          onUnavailable?.();
+        }
+      } catch {
+        if (!cancelled) onUnavailable?.();
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [resourceId, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Outline: give every heading an id, then hand the parent a de-duplicated
+  // chip list (repeated page-header titles collapse to their first occurrence).
+  // Must run before the scroll effect below so the ids exist for scroll-spy.
+  useEffect(() => {
+    if (!html || !articleRef.current) return;
+    const heads = Array.from(articleRef.current.querySelectorAll("h1, h2, h3"));
+    const seen = new Set();
+    const outline = [];
+    heads.forEach((h, i) => {
+      const text = h.textContent.replace(/\s+/g, " ").trim();
+      h.id = `rdsec-${i}`;
+      if (!text) return;
+      const key = text.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      outline.push({
+        id: h.id,
+        text: text.length > 60 ? `${text.slice(0, 57)}…` : text,
+        level: Number(h.tagName[1]),
+      });
+    });
+    // Chip row wants the major sections; fall back to all levels when the
+    // document has no real h1/h2 structure.
+    let chips = outline.filter((o) => o.level <= 2);
+    if (chips.length < 3) chips = outline;
+    chips = chips.slice(0, 14);
+    headingElsRef.current = chips
+      .map((o) => document.getElementById(o.id))
+      .filter(Boolean);
+    onOutline?.(chips);
+  }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll-based progress + scroll-spy. The article lives inside the
+  // scrollable reader box, so measure against the nearest scrollable
+  // ancestor (fallback: window).
+  useEffect(() => {
+    if (!html || !articleRef.current) return;
+    const el = articleRef.current;
+
+    let scroller = null;
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      const { overflowY } = getComputedStyle(node);
+      if (overflowY === "auto" || overflowY === "scroll") { scroller = node; break; }
+    }
+
+    function measure() {
+      const rect = el.getBoundingClientRect();
+      if (rect.height < 1) return;
+      const scrollerRect = scroller ? scroller.getBoundingClientRect() : null;
+      const viewBottom = scrollerRect ? scrollerRect.bottom : window.innerHeight;
+      const seen = Math.min(Math.max(viewBottom - rect.top, 0), rect.height);
+      const pct = Math.round((seen / rect.height) * 100);
+      if (pct > maxPctRef.current) {
+        maxPctRef.current = pct;
+        onProgress(pct);
+      }
+
+      // Scroll-spy: the active section is the last heading scrolled past.
+      const viewTop = scrollerRect ? scrollerRect.top : 0;
+      let active = null;
+      for (const h of headingElsRef.current) {
+        if (h.getBoundingClientRect().top <= viewTop + 100) active = h.id;
+        else break;
+      }
+      if (active !== activeSecRef.current) {
+        activeSecRef.current = active;
+        onActiveSection?.(active);
+      }
+    }
+
+    measure();
+    const target = scroller ?? window;
+    target.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    const ro = new ResizeObserver(measure); // images loading change the height
+    ro.observe(el);
+    return () => {
+      target.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+    };
+  }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyword search: debounce, then highlight every match in the article.
+  useEffect(() => {
+    if (!html || !articleRef.current) return;
+    const timer = setTimeout(() => {
+      const root = articleRef.current;
+      if (!root) return;
+      clearDocHighlights(root);
+      marksRef.current = [];
+      const q = query.trim();
+      if (q.length >= 2) {
+        marksRef.current = highlightDocMatches(root, q);
+        if (marksRef.current.length > 0) {
+          marksRef.current[0].classList.add("rd-doc-hl-current");
+          marksRef.current[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+      setMatchCount(marksRef.current.length);
+      setCurrentIdx(0);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, html]);
+
+  function gotoMatch(delta) {
+    const marks = marksRef.current;
+    if (marks.length === 0) return;
+    const next = (currentIdx + delta + marks.length) % marks.length;
+    marks[currentIdx]?.classList.remove("rd-doc-hl-current");
+    marks[next].classList.add("rd-doc-hl-current");
+    marks[next].scrollIntoView({ behavior: "smooth", block: "center" });
+    setCurrentIdx(next);
+  }
+
+  if (loading) {
+    return (
+      <div className="rd-pdf-loading">
+        <div className="rd-pdf-spinner" />
+        <span>Preparing web version…</span>
+      </div>
+    );
+  }
+  if (!html) return null; // parent switches to the fallback viewer
+
+  const hasQuery = query.trim().length >= 2;
+
+  return (
+    <>
+      <div className="rd-docsearch">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" width="15" height="15" aria-hidden="true" className="rd-docsearch-icon">
+          <circle cx="9" cy="9" r="5.5" /><path d="M13.5 13.5L17 17" />
+        </svg>
+        <input
+          type="search"
+          className="rd-docsearch-input"
+          placeholder="Search in this document…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); gotoMatch(1); }
+            if (e.key === "Escape") setQuery("");
+          }}
+          aria-label="Search within the document"
+        />
+        {hasQuery && (
+          <span className="rd-docsearch-count">
+            {matchCount === 0 ? "No matches" : `${currentIdx + 1} / ${matchCount}`}
+          </span>
+        )}
+        {matchCount > 0 && (
+          <span className="rd-docsearch-nav">
+            <button type="button" onClick={() => gotoMatch(-1)} title="Previous match" aria-label="Previous match">↑</button>
+            <button type="button" onClick={() => gotoMatch(1)} title="Next match" aria-label="Next match">↓</button>
+          </span>
+        )}
+        {hasQuery && (
+          <button type="button" className="rd-docsearch-clear" onClick={() => setQuery("")} title="Clear search">
+            ×
+          </button>
+        )}
+      </div>
+      <article
+        ref={articleRef}
+        className="rd-htmldoc"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </>
+  );
+}
+
 // ── PdfDocReader ──────────────────────────────────────────────────────────────
 function PdfDocReader({ url, seenPages, onPageSeen, onNumPages }) {
   const containerRef = useRef(null);
@@ -357,7 +622,12 @@ function QuizModal({ resourceId, onClose }) {
     setSubmitError("");
   }
 
-  const allAnswered = questions.length > 0 && questions.every((q) => answers[q.id] != null);
+  // Short-answer questions count as answered once something is typed.
+  const isAnswered = (q) =>
+    q.question_type === "short"
+      ? Boolean((answers[q.id] ?? "").trim())
+      : answers[q.id] != null;
+  const allAnswered = questions.length > 0 && questions.every(isAnswered);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
@@ -405,14 +675,18 @@ function QuizModal({ resourceId, onClose }) {
                 {r.your_answer && (
                   <p className="rd-qr-ans">
                     <span className="rd-qr-label">Your answer:</span>{" "}
-                    {r.your_answer.toUpperCase()}. {r.options[r.your_answer]}
+                    {r.question_type === "short"
+                      ? `“${r.your_answer}”`
+                      : `${r.your_answer.toUpperCase()}. ${r.options[r.your_answer]}`}
                     {r.is_correct ? " ✓" : " ✗"}
                   </p>
                 )}
-                {!r.is_correct && r.correct && (
+                {!r.is_correct && (r.correct || r.correct_text) && (
                   <p className="rd-qr-correct-ans">
                     <span className="rd-qr-label">Correct:</span>{" "}
-                    {r.correct.toUpperCase()}. {r.options[r.correct]}
+                    {r.question_type === "short"
+                      ? r.correct_text
+                      : `${r.correct.toUpperCase()}. ${r.options[r.correct]}`}
                   </p>
                 )}
                 {r.explanation && <p className="rd-qr-explanation">{r.explanation}</p>}
@@ -446,24 +720,43 @@ function QuizModal({ resourceId, onClose }) {
         <div className="rd-quiz-progress-bar">
           <div className="rd-quiz-progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
+        <p className="rd-quiz-source-note">
+          📖 According to this document — every answer is found in the material you just read.
+        </p>
         <p className="rd-quiz-counter">Question {current + 1} of {questions.length}</p>
 
         <p className="rd-quiz-question">{q.question}</p>
 
-        <div className="rd-quiz-options">
-          {OPT_KEYS.map((key, idx) => (
-            q[`option_${key}`] ? (
-              <button
-                key={key}
-                className={`rd-quiz-option${answers[q.id] === key ? " rd-quiz-option-selected" : ""}`}
-                onClick={() => setAnswers(prev => ({ ...prev, [q.id]: key }))}
-              >
-                <span className="rd-quiz-opt-letter">{OPT_LABELS[idx]}</span>
-                {q[`option_${key}`]}
-              </button>
-            ) : null
-          ))}
-        </div>
+        {q.question_type === "short" ? (
+          <div className="rd-quiz-short">
+            <input
+              type="text"
+              className="rd-quiz-short-input"
+              placeholder="Type your answer from the document…"
+              value={answers[q.id] ?? ""}
+              onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+              autoFocus
+            />
+            <p className="rd-quiz-short-hint">
+              Straight answer — capitals and punctuation don't matter.
+            </p>
+          </div>
+        ) : (
+          <div className="rd-quiz-options">
+            {OPT_KEYS.map((key, idx) => (
+              q[`option_${key}`] ? (
+                <button
+                  key={key}
+                  className={`rd-quiz-option${answers[q.id] === key ? " rd-quiz-option-selected" : ""}`}
+                  onClick={() => setAnswers(prev => ({ ...prev, [q.id]: key }))}
+                >
+                  <span className="rd-quiz-opt-letter">{OPT_LABELS[idx]}</span>
+                  {q[`option_${key}`]}
+                </button>
+              ) : null
+            ))}
+          </div>
+        )}
 
         {submitError && <p className="rd-quiz-error">{submitError}</p>}
 
@@ -478,7 +771,7 @@ function QuizModal({ resourceId, onClose }) {
             <button
               className="rd-quiz-btn rd-quiz-btn-active"
               onClick={() => setCurrent(c => c + 1)}
-              disabled={answers[q.id] == null}
+              disabled={!isAnswered(q)}
             >Next →</button>
           ) : (
             <button
@@ -628,7 +921,12 @@ export default function ResourceDetail() {
   const [quizOpen, setQuizOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedLang, setSelectedLang] = useState("");
+  const [docView, setDocView] = useState("web");        // "web" | "original"
+  const [webAvailable, setWebAvailable] = useState(null); // null=unknown yet
+  const [outline, setOutline] = useState([]);           // section chips (from doc headings)
+  const [activeSection, setActiveSection] = useState(null);
   const apiSyncTimerRef = useRef(null);
+  const progressRef = useRef(0);
 
   // Load resource + progress (API for authenticated users, cookie/localStorage otherwise)
   useEffect(() => {
@@ -677,6 +975,28 @@ export default function ResourceDetail() {
     })();
   }, [id, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A different resource or language file gets a fresh web-view decision.
+  useEffect(() => {
+    setDocView("web");
+    setWebAvailable(null);
+    setOutline([]);
+    setActiveSection(null);
+  }, [id, selectedLang]);
+
+  const handleOutline = useCallback((chips) => setOutline(chips), []);
+  const handleActiveSection = useCallback((secId) => setActiveSection(secId), []);
+
+  function jumpToSection(secId) {
+    const el = document.getElementById(secId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Mirror progress into a ref so the web-reader handler can stay monotonic
+  // (a fresh reader reporting 5% must not clobber a restored 80%).
+  useEffect(() => {
+    progressRef.current = Math.max(progressRef.current, progress);
+  }, [progress]);
+
   // Debounced API sync for authenticated users
   function scheduleApiSync(id, data) {
     if (!user) return;
@@ -706,6 +1026,18 @@ export default function ResourceDetail() {
   const handleNumPages = useCallback((n) => {
     setNumPages(n);
   }, []);
+
+  // Progress from the web (HTML) reader — only ever moves forward.
+  const handleDocProgress = useCallback(
+    (pct) => {
+      if (pct <= progressRef.current) return;
+      progressRef.current = pct;
+      setProgress(pct);
+      saveProgress(id, { progress: pct });
+      scheduleApiSync(id, { progress: pct, seen_pages: [], completed: pct >= 100 });
+    },
+    [id, user] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const handleVideoProgress = useCallback(
     (pct) => {
@@ -769,7 +1101,13 @@ export default function ResourceDetail() {
   const activeUrl = (activeFile && activeFile.url) || file_url;
 
   const isVideo = type_key === "vid";
-  const isPdf = activeUrl?.split("?")[0].toLowerCase().endsWith(".pdf");
+  const cleanUrl = activeUrl?.split("?")[0].toLowerCase() ?? "";
+  const isPdf = cleanUrl.endsWith(".pdf");
+  const isDocx = cleanUrl.endsWith(".docx");
+  // PDF/DOCX get the converted web version by default; readers can switch to
+  // the original, and we fall back automatically when no conversion exists.
+  const isDocFile = (isPdf || isDocx) && !isVideo;
+  const showWebReader = isDocFile && docView === "web" && webAvailable !== false;
 
   // Clean filename for the Download button (keeps the real extension).
   const fileExt = (activeUrl?.split("?")[0].split(".").pop() || "").toLowerCase();
@@ -859,22 +1197,64 @@ export default function ResourceDetail() {
             <span className="rd-lang-pick-hint">applies to preview, open &amp; download</span>
           </div>
         )}
+
+        {/* Section chips — jump straight to a heading in the web version */}
+        {showWebReader && webAvailable && outline.length > 1 && (
+          <div className="rd-sections">
+            <span className="rd-sections-label">Jump to</span>
+            <div className="rd-section-chips" role="navigation" aria-label="Document sections">
+              {outline.map((sec) => (
+                <button
+                  key={sec.id}
+                  type="button"
+                  className={
+                    "rd-section-chip" +
+                    (sec.id === activeSection ? " rd-section-chip-active" : "") +
+                    (sec.level >= 3 ? " rd-section-chip-sub" : "")
+                  }
+                  title={sec.text}
+                  onClick={() => jumpToSection(sec.id)}
+                >
+                  {sec.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Reader section */}
       <div className="rd-reader-section">
         <div className="rd-reader-header">
-          <h2 className="rd-section-title">{isVideo ? "Video" : "Document"}</h2>
-          {activeUrl && (
-            <a
-              href={activeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rd-openfile-link"
-            >
-              {isVideo ? "Open video" : "Open file"}{langs.length > 1 ? ` (${LANG_NAMES[activeLang] || activeLang})` : ""} ↗
-            </a>
-          )}
+          <h2 className="rd-section-title">
+            {isVideo ? "Video" : "Document"}
+            {showWebReader && webAvailable && (
+              <span className="rd-webver-badge">Web version</span>
+            )}
+          </h2>
+          <div className="rd-reader-header-actions">
+            {isDocFile && webAvailable && (
+              <button
+                type="button"
+                className="rd-viewtoggle-btn"
+                onClick={() => setDocView((v) => (v === "web" ? "original" : "web"))}
+              >
+                {docView === "web"
+                  ? `View original ${isPdf ? "PDF" : "file"}`
+                  : "View web version"}
+              </button>
+            )}
+            {activeUrl && (
+              <a
+                href={activeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rd-openfile-link"
+              >
+                {isVideo ? "Open video" : "Open file"}{langs.length > 1 ? ` (${LANG_NAMES[activeLang] || activeLang})` : ""} ↗
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -889,7 +1269,18 @@ export default function ResourceDetail() {
         </div>
 
         <div className="rd-reader-box">
-          {isPdf && activeUrl ? (
+          {showWebReader && activeUrl ? (
+            <HtmlDocReader
+              key={activeUrl}
+              resourceId={resource.slug || resource.id}
+              lang={activeLang}
+              onProgress={handleDocProgress}
+              onReady={() => setWebAvailable(true)}
+              onUnavailable={() => setWebAvailable(false)}
+              onOutline={handleOutline}
+              onActiveSection={handleActiveSection}
+            />
+          ) : isPdf && activeUrl ? (
             <PdfDocReader
               key={activeUrl}
               url={activeUrl}
