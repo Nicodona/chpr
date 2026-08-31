@@ -66,7 +66,7 @@ export default function Home() {
         {/* Foreground — centered content */}
         <div className="hero-fg">
           <h1 className="hero-anim-title">
-            Advancing Health <span className="hero-anim-title-accent">Together</span>
+            &nbsp;
           </h1>
 
           <div className="hero-search hero-anim-search">

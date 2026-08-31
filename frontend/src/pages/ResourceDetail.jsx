@@ -921,7 +921,7 @@ export default function ResourceDetail() {
   const [quizOpen, setQuizOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedLang, setSelectedLang] = useState("");
-  const [docView, setDocView] = useState("web");        // "web" | "original"
+  const [docView, setDocView] = useState("original");        // "web" | "original"
   const [webAvailable, setWebAvailable] = useState(null); // null=unknown yet
   const [outline, setOutline] = useState([]);           // section chips (from doc headings)
   const [activeSection, setActiveSection] = useState(null);
@@ -977,7 +977,7 @@ export default function ResourceDetail() {
 
   // A different resource or language file gets a fresh web-view decision.
   useEffect(() => {
-    setDocView("web");
+    setDocView("original");
     setWebAvailable(null);
     setOutline([]);
     setActiveSection(null);
@@ -1233,7 +1233,7 @@ export default function ResourceDetail() {
             )}
           </h2>
           <div className="rd-reader-header-actions">
-            {isDocFile && webAvailable && (
+            {isDocFile && webAvailable !== false && (
               <button
                 type="button"
                 className="rd-viewtoggle-btn"
@@ -1310,7 +1310,8 @@ export default function ResourceDetail() {
         </div>
       </div>
 
-      {/* Test Your Understanding */}
+      {/* Test Your Understanding (hidden for document resources per team request; kept for videos) */}
+      {!isDocFile && (
       <div className="rd-quiz-section">
         <div className="rd-quiz-section-inner">
           <div className="rd-quiz-info">
@@ -1330,6 +1331,7 @@ export default function ResourceDetail() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Comments */}
       <CommentSection resourceId={resource.id} user={user} />
