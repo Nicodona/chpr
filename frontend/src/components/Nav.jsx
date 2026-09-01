@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useSiteText } from "../context/SiteTextContext";
 import { fetchNavProjects } from "../api";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -153,18 +154,26 @@ export default function Nav() {
         : user.username)
     : "";
 
+  const brandName = useSiteText("nav.brand_name", "CHPR Resources");
+  const brandTagline = useSiteText("nav.brand_tagline", "Knowledge Hub");
+  const allResources = useSiteText("nav.all_resources", "All Resources");
+  const projectsLabel = useSiteText("nav.projects", "Projects");
+  const navSearchPlaceholder = useSiteText("nav.search_placeholder", "Search resources…");
+  const contactLabel = useSiteText("nav.contact", "Contact");
+  const signInLabel = useSiteText("nav.sign_in", "Sign in");
+
   return (
     <>
       <nav className="nav">
         <Link to="/" className="nav-logo">
           <div className="nav-logo-mark">CH</div>
           <div className="nav-logo-text">
-            CHPR Resources<span>Knowledge Hub</span>
+            {brandName}<span>{brandTagline}</span>
           </div>
         </Link>
 
         <div className="nav-links">
-          <Link to="/resources" className="nav-link">All Resources</Link>
+          <Link to="/resources" className="nav-link">{allResources}</Link>
 
           {/* Projects are visible to logged-in staff only. */}
           {user && (
@@ -176,7 +185,7 @@ export default function Nav() {
               aria-expanded={projectsOpen}
               aria-haspopup="true"
             >
-              Projects
+              {projectsLabel}
               <svg className="nav-projects-caret" style={{ width:11, height:11, marginLeft:6, transition:"transform .15s", transform: projectsOpen ? "rotate(180deg)" : "none" }} viewBox="0 0 12 12" fill="none">
                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               </svg>
@@ -203,7 +212,7 @@ export default function Nav() {
         <div className="nav-search">
           <input
             type="text"
-            placeholder="Search resources…"
+            placeholder={navSearchPlaceholder}
             value={q}
             onChange={e => setQ(e.target.value)}
             onKeyDown={submitSearch}
@@ -267,9 +276,9 @@ export default function Nav() {
           ) : (
             <div className="nav-guest-btns">
               <button className="nav-contact-guest" onClick={() => setContactOpen(true)}>
-                Contact
+                {contactLabel}
               </button>
-              <Link to="/login" className="nav-cta nav-cta-secondary">Sign in</Link>
+              <Link to="/login" className="nav-cta nav-cta-secondary">{signInLabel}</Link>
             </div>
           )}
         </div>
@@ -295,10 +304,10 @@ export default function Nav() {
         {/* ── Mobile drawer ── */}
         {mobileOpen && (
           <div className="nav-mobile-drawer">
-            <Link to="/resources" className="nav-link" onClick={() => setMobileOpen(false)}>All Resources</Link>
+            <Link to="/resources" className="nav-link" onClick={() => setMobileOpen(false)}>{allResources}</Link>
             {user && navProjects.length > 0 && (
               <>
-                <div className="nav-drawer-label">Projects</div>
+                <div className="nav-drawer-label">{projectsLabel}</div>
                 {navProjects.map(p => (
                   <Link key={p.slug} to={`/projects/${p.slug}`} className="nav-link nav-drawer-project" onClick={() => setMobileOpen(false)}>
                     <span className="nav-projects-mark" style={{ background: p.color || "var(--primary)" }}>{projInitials(p)}</span>
@@ -342,9 +351,9 @@ export default function Nav() {
               <>
                 <button className="nav-menu-item" onClick={() => { setMobileOpen(false); setContactOpen(true); }}>
                   <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" style={{marginRight:8,flexShrink:0}}><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
-                  Contact
+                  {contactLabel}
                 </button>
-                <Link to="/login" className="nav-mobile-signin" onClick={() => setMobileOpen(false)}>Sign in</Link>
+                <Link to="/login" className="nav-mobile-signin" onClick={() => setMobileOpen(false)}>{signInLabel}</Link>
               </>
             )}
           </div>

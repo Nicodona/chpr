@@ -64,6 +64,11 @@ export default function Home() {
     "home.search_placeholder",
     "Search resources, protocols, materials…",
   );
+  const projectsEyebrow = useSiteText("home.projects_eyebrow", "Active programmes");
+  const projectsTitle = useSiteText("home.projects_title", "Projects");
+  const latestEyebrow = useSiteText("home.latest_eyebrow", "Latest");
+  const latestTitle = useSiteText("home.latest_title", "Recently added resources");
+  const seeAll = useSiteText("home.see_all", "See all →");
 
   return (
     <>
@@ -114,8 +119,8 @@ export default function Home() {
           <>
             <div className="section-header">
               <div>
-                <span className="section-eyebrow">Active programmes</span>
-                <h2 className="section-title">Projects</h2>
+                <span className="section-eyebrow">{projectsEyebrow}</span>
+                <h2 className="section-title">{projectsTitle}</h2>
               </div>
               {projects.length > homeCount && (
                 <Link to="/projects" className="section-link">View all projects →</Link>
@@ -134,10 +139,10 @@ export default function Home() {
 
         <div className="section-header">
           <div>
-            <span className="section-eyebrow">Latest</span>
-            <h2 className="section-title">Recently added resources</h2>
+            <span className="section-eyebrow">{latestEyebrow}</span>
+            <h2 className="section-title">{latestTitle}</h2>
           </div>
-          <Link to="/resources" className="section-link">See all →</Link>
+          <Link to="/resources" className="section-link">{seeAll}</Link>
         </div>
 
         <Filters label="Filter:" options={typeFilters} value={type} onChange={setType} />

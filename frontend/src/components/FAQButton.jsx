@@ -1,8 +1,10 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useSiteText } from "../context/SiteTextContext";
 
 export default function FAQButton() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const label = useSiteText("faq.button_label", "FAQ");
 
   if (pathname === "/faq") return null;
 
@@ -19,7 +21,7 @@ export default function FAQButton() {
         <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
         <circle cx="12" cy="17" r="0.5" fill="currentColor" />
       </svg>
-      <span className="faq-float-label">FAQ</span>
+      <span className="faq-float-label">{label}</span>
     </button>
   );
 }

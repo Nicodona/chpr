@@ -94,6 +94,13 @@ class SiteTextAPITests(TestCase):
         self.assertIn("home.hero_title", keys)
         self.assertIn("home.search_placeholder", keys)
 
+    def test_seed_migration_created_chrome_keys(self):
+        """Second seed batch: nav / footer / home headings / FAQ button."""
+        keys = set(SiteText.objects.values_list("key", flat=True))
+        for k in ("nav.all_resources", "nav.sign_in", "home.latest_title",
+                  "footer.org_name", "faq.button_label"):
+            self.assertIn(k, keys)
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class ResourceLanguageAPITests(TestCase):
