@@ -1291,6 +1291,98 @@ function AnalyticsTab() {
   );
 }
 
+// ── Content tab (editable site text) ─────────────────────────────────────────
+function ContentTab() {
+  const [items, setItems]     = useState([]);
+  const [drafts, setDrafts]   = useState({});   // id -> edited value
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [savedId, setSavedId]   = useState(null);
+  const [err, setErr]         = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await authedGet("/api/site-text/");
+      const list = data.results ?? data;
+      setItems(list);
+      setDrafts(Object.fromEntries(list.map(t => [t.id, t.value ?? ""])));
+    } catch { setItems([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function save(item) {
+    setSavingId(item.id); setErr(""); setSavedId(null);
+    try {
+      const value = drafts[item.id] ?? "";
+      await authedPatch(`/api/site-text/${item.id}/`, { value });
+      setItems(prev => prev.map(t => t.id === item.id ? { ...t, value } : t));
+      setSavedId(item.id);
+      setTimeout(() => setSavedId(s => (s === item.id ? null : s)), 2000);
+    } catch (e) { setErr(e.message || "Save failed."); }
+    finally { setSavingId(null); }
+  }
+
+  if (loading) {
+    return <div className="mp-tab-content"><div className="mp-loading">Loading content…</div></div>;
+  }
+
+  const groups = {};
+  for (const it of items) (groups[it.group] ||= []).push(it);
+
+  return (
+    <div className="mp-tab-content">
+      <div className="mp-toolbar">
+        <span className="mp-count">{items.length} editable text{items.length !== 1 ? "s" : ""}</span>
+      </div>
+      <p className="field-hint" style={{margin:"0 0 1rem"}}>
+        Edit the wording shown on the site. Changes go live immediately. Leaving a field blank hides that text.
+      </p>
+      {err && <div className="field-error" style={{display:"block",marginBottom:"0.75rem"}}>{err}</div>}
+      {items.length === 0 ? (
+        <div className="mp-empty">No editable text is registered yet.</div>
+      ) : Object.keys(groups).map(g => (
+        <div key={g} className="mp-card" style={{marginBottom:"1rem"}}>
+          <h3 className="mp-card-title">{g}</h3>
+          {groups[g].map(it => {
+            const dirty = (drafts[it.id] ?? "") !== (it.value ?? "");
+            const long  = (drafts[it.id] ?? "").length > 60;
+            return (
+              <div className="field" key={it.id}>
+                <label className="field-label">{it.label}</label>
+                {long ? (
+                  <textarea className="field-textarea" rows={3} value={drafts[it.id] ?? ""}
+                    onChange={e => setDrafts(d => ({ ...d, [it.id]: e.target.value }))} />
+                ) : (
+                  <input className="field-input" value={drafts[it.id] ?? ""}
+                    onChange={e => setDrafts(d => ({ ...d, [it.id]: e.target.value }))} />
+                )}
+                <div style={{display:"flex",alignItems:"center",gap:"0.6rem",marginTop:"0.4rem"}}>
+                  <button className="mp-btn mp-btn-save" disabled={!dirty || savingId === it.id}
+                    onClick={() => save(it)}>
+                    {savingId === it.id ? "Saving…" : "Save"}
+                  </button>
+                  {dirty && (
+                    <button className="mp-btn mp-btn-cancel"
+                      onClick={() => setDrafts(d => ({ ...d, [it.id]: it.value ?? "" }))}>
+                      Reset
+                    </button>
+                  )}
+                  {savedId === it.id && <span className="mp-tag mp-tag-active">Saved</span>}
+                  <span className="field-hint" style={{marginLeft:"auto"}}>{it.key}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ManagePanel() {
   const { user, ready } = useAuth();
@@ -1326,6 +1418,7 @@ export default function ManagePanel() {
           { key:"projects",   label:"Projects" },
           { key:"users",      label:"Users" },
           { key:"faq",        label:"FAQ" },
+          { key:"content",    label:"Content" },
           { key:"messages",   label:"Messages" },
           { key:"analytics",  label:"Analytics" },
         ].map(t => (
@@ -1343,6 +1436,7 @@ export default function ManagePanel() {
       {tab === "projects"   && <ProjectsTab />}
       {tab === "users"      && <UsersTab />}
       {tab === "faq"        && <FaqTab />}
+      {tab === "content"    && <ContentTab />}
       {tab === "messages"   && <MessagesTab />}
       {tab === "analytics"  && <AnalyticsTab />}
     </main>

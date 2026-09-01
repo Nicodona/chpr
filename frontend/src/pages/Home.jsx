@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { fetchProjects, fetchResources, fetchSiteConfig } from "../api";
 import { availableTypeFilters, filterByType, hasPoolResources } from "../filters";
 import { useAuth } from "../context/AuthContext";
+import { useSiteText } from "../context/SiteTextContext";
 import ResourceTile from "../components/ResourceTile";
 import ProjectCard from "../components/ProjectCard";
 import Filters from "../components/Filters";
@@ -58,6 +59,12 @@ export default function Home() {
   const typeFilters = useMemo(() => availableTypeFilters(resources), [resources]);
   const filtered = useMemo(() => filterByType(resources, type), [resources, type]);
 
+  const heroTitle = useSiteText("home.hero_title", "");
+  const searchPlaceholder = useSiteText(
+    "home.search_placeholder",
+    "Search resources, protocols, materials…",
+  );
+
   return (
     <>
       {/* ── Hero ── */}
@@ -65,9 +72,7 @@ export default function Home() {
 
         {/* Foreground — centered content */}
         <div className="hero-fg">
-          <h1 className="hero-anim-title">
-            &nbsp;
-          </h1>
+          <h1 className="hero-anim-title">{heroTitle || " "}</h1>
 
           <div className="hero-search hero-anim-search">
             <svg className="hero-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -75,7 +80,7 @@ export default function Home() {
             </svg>
             <input
               type="text"
-              placeholder="Search resources, protocols, materials…"
+              placeholder={searchPlaceholder}
               value={q}
               onChange={e => setQ(e.target.value)}
               onKeyDown={e => e.key === "Enter" && q.trim() && navigate(`/resources?search=${encodeURIComponent(q.trim())}`)}

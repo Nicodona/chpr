@@ -17,6 +17,7 @@ from .views import (
     ResourceCommentViewSet,
     ResourceViewSet,
     SiteConfigView,
+    SiteTextViewSet,
     TrackInteractionView,
     TrackVisitView,
 )
@@ -28,6 +29,7 @@ router.register("comments", ResourceCommentViewSet, basename="comment")
 router.register("contact", ContactMessageViewSet, basename="contact")
 router.register("quiz-questions", QuizQuestionViewSet, basename="quiz-question")
 router.register("faq", FAQViewSet, basename="faq")
+router.register("site-text", SiteTextViewSet, basename="site-text")
 
 urlpatterns = [
     path("", include(router.urls)),

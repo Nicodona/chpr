@@ -9,7 +9,9 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from chpr.models import Project, Resource, ResourceFile, SiteConfig
+from django.contrib.auth.models import User
+
+from chpr.models import Project, Resource, ResourceFile, SiteConfig, SiteText, StaffProfile
 
 
 def _rows(payload):
@@ -17,6 +19,80 @@ def _rows(payload):
     if isinstance(payload, dict) and "results" in payload:
         return payload["results"]
     return payload
+
+
+class SiteTextAPITests(TestCase):
+    """Editable site text: public reads, admin-only writes, value-only edits."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.entry = SiteText.objects.create(
+            key="test.greeting", value="Hello", label="Test greeting",
+            group="Test", order=1,
+        )
+        self.admin = User.objects.create_user("admin_t", password="x")
+        StaffProfile.objects.create(user=self.admin, role="admin")
+        self.staff = User.objects.create_user("staff_t", password="x")
+        StaffProfile.objects.create(user=self.staff, role="staff")
+
+    def test_list_is_public_and_includes_entry(self):
+        res = self.client.get("/api/site-text/")
+        self.assertEqual(res.status_code, 200)
+        by_key = {r["key"]: r for r in _rows(res.json())}
+        self.assertIn("test.greeting", by_key)
+        self.assertEqual(by_key["test.greeting"]["value"], "Hello")
+        self.assertEqual(by_key["test.greeting"]["label"], "Test greeting")
+
+    def test_anonymous_cannot_edit(self):
+        res = self.client.patch(
+            f"/api/site-text/{self.entry.id}/", {"value": "Hacked"}, format="json"
+        )
+        self.assertIn(res.status_code, (401, 403))
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.value, "Hello")
+
+    def test_staff_non_admin_cannot_edit(self):
+        self.client.force_authenticate(self.staff)
+        res = self.client.patch(
+            f"/api/site-text/{self.entry.id}/", {"value": "Nope"}, format="json"
+        )
+        self.assertEqual(res.status_code, 403)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.value, "Hello")
+
+    def test_admin_can_edit_value(self):
+        self.client.force_authenticate(self.admin)
+        res = self.client.patch(
+            f"/api/site-text/{self.entry.id}/", {"value": "Updated"}, format="json"
+        )
+        self.assertEqual(res.status_code, 200)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.value, "Updated")
+
+    def test_key_is_read_only(self):
+        self.client.force_authenticate(self.admin)
+        res = self.client.patch(
+            f"/api/site-text/{self.entry.id}/",
+            {"key": "test.renamed", "value": "V"}, format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.key, "test.greeting")  # unchanged
+        self.assertEqual(self.entry.value, "V")
+
+    def test_no_create_or_delete_via_api(self):
+        self.client.force_authenticate(self.admin)
+        res = self.client.post(
+            "/api/site-text/", {"key": "x", "value": "y", "label": "z"}, format="json"
+        )
+        self.assertEqual(res.status_code, 405)
+        res = self.client.delete(f"/api/site-text/{self.entry.id}/")
+        self.assertEqual(res.status_code, 405)
+
+    def test_seed_migration_created_home_keys(self):
+        keys = set(SiteText.objects.values_list("key", flat=True))
+        self.assertIn("home.hero_title", keys)
+        self.assertIn("home.search_placeholder", keys)
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

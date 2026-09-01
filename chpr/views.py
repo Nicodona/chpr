@@ -22,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import doc_convert, quiz_gen
-from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceHTML, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizAttempt, QuizQuestion, ReadingProgress, Resource, ResourceComment, ResourceHTML, ResourceInteraction, SiteConfig, SiteText, SiteVisit, StaffProfile
 from .serializers import (
     ChangePasswordSerializer,
     ContactMessageSerializer,
@@ -35,6 +35,7 @@ from .serializers import (
     ResourceCommentSerializer,
     ResourceSerializer,
     SiteConfigSerializer,
+    SiteTextSerializer,
     UserSerializer,
 )
 
@@ -674,6 +675,30 @@ class FAQViewSet(viewsets.ModelViewSet):
         if not _is_admin(self.request.user):
             raise PermissionDenied("Admin access required.")
         instance.delete()
+
+
+# ---------------------------------------------------------------------------
+# Editable site text
+# ---------------------------------------------------------------------------
+
+class SiteTextViewSet(viewsets.ModelViewSet):
+    """
+    Editable on-site text snippets (home hero title, search placeholder, …).
+    Reads are public — the site consumes them. Writes are admin-only and only
+    the ``value`` may change (key/label/group/order are code-managed). Keys are
+    created by the seed migration, not via the API, so listing and editing are
+    the only operations exposed.
+    """
+    queryset = SiteText.objects.all()
+    serializer_class = SiteTextSerializer
+    authentication_classes = AUTH_BACKENDS
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def perform_update(self, serializer):
+        if not _is_admin(self.request.user):
+            raise PermissionDenied("Admin access required.")
+        serializer.save()
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, SiteConfig, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, SiteConfig, SiteText, StaffProfile
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -33,6 +33,16 @@ class SiteConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = SiteConfig
         fields = ["nav_projects_count", "home_projects_count"]
+
+
+class SiteTextSerializer(serializers.ModelSerializer):
+    """Only ``value`` is writable; identity/label/grouping are code-managed so
+    an editor can never rename a key the frontend depends on."""
+
+    class Meta:
+        model = SiteText
+        fields = ["id", "key", "value", "label", "group", "order"]
+        read_only_fields = ["id", "key", "label", "group", "order"]
 
 
 class ProjectPKOrSlugField(serializers.PrimaryKeyRelatedField):

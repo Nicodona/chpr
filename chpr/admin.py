@@ -1,7 +1,7 @@
 """Django admin registrations for the CHPR Resources Hub."""
 from django.contrib import admin
 
-from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, ResourceHTML, ResourceInteraction, SiteConfig, SiteVisit, StaffProfile
+from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, ResourceHTML, ResourceInteraction, SiteConfig, SiteText, SiteVisit, StaffProfile
 
 
 @admin.register(StaffProfile)
@@ -46,6 +46,15 @@ class SiteConfigAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SiteText)
+class SiteTextAdmin(admin.ModelAdmin):
+    list_display = ("label", "key", "group", "order", "updated_at")
+    search_fields = ("key", "label", "value")
+    list_filter = ("group",)
+    ordering = ("group", "order", "key")
+    readonly_fields = ("updated_at",)
 
 
 class ResourceFileInline(admin.TabularInline):

@@ -104,6 +104,16 @@ export async function fetchSiteConfig() {
   return res.json();
 }
 
+// ── Site text (editable on-site copy) ─────────────────────────────────────────
+
+/** All editable text snippets: [{ id, key, value, label, group, order }]. */
+export async function fetchSiteText() {
+  const res = await fetch(`${BASE}/api/site-text/`);
+  if (!res.ok) throw new Error("Failed to fetch site text");
+  const data = await res.json();
+  return data.results ?? data;
+}
+
 // ── Resources ─────────────────────────────────────────────────────────────────
 
 /**

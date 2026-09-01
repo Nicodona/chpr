@@ -113,6 +113,44 @@ class SiteConfig(models.Model):
         return obj
 
 
+class SiteText(models.Model):
+    """An editable piece of on-site copy (e.g. the home hero title) so staff can
+    change wording from the Management Panel without a code change.
+
+    ``key`` is a stable identifier referenced in the frontend *with a hardcoded
+    fallback*, so a missing or blank row never leaves the page broken. Only
+    ``value`` is meant to change; key/label/group/order are set in code via the
+    seed migration and stay read-only through the API.
+    """
+
+    key = models.CharField(
+        max_length=100, unique=True,
+        help_text="Stable identifier used in the code, e.g. 'home.hero_title'. "
+                  "Do not change once it is referenced.",
+    )
+    value = models.TextField(blank=True, help_text="The text shown on the site.")
+    label = models.CharField(max_length=150, help_text="Friendly name shown in the editor.")
+    group = models.CharField(
+        max_length=60, default="General",
+        help_text="Category for grouping in the editor, e.g. 'Home', 'Navigation'.",
+    )
+    order = models.PositiveIntegerField(default=0, help_text="Sort order within a group.")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["group", "order", "key"]
+        verbose_name = "Site text"
+        verbose_name_plural = "Site text"
+
+    def __str__(self):
+        return f"{self.label} ({self.key})"
+
+    @classmethod
+    def as_map(cls):
+        """{key: value} for the whole table — what the public API returns."""
+        return {t.key: t.value for t in cls.objects.all()}
+
+
 class Resource(models.Model):
     """
     A resource attached to a project. Supports a file upload (PDF, video, image)

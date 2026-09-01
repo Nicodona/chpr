@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { SiteTextProvider } from "./context/SiteTextContext";
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
 import FAQButton from "./components/FAQButton";
@@ -103,7 +104,9 @@ function AppInner() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppInner />
+      <SiteTextProvider>
+        <AppInner />
+      </SiteTextProvider>
     </AuthProvider>
   );
 }
