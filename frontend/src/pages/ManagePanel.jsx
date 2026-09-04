@@ -1371,7 +1371,6 @@ function ContentTab() {
                     </button>
                   )}
                   {savedId === it.id && <span className="mp-tag mp-tag-active">Saved</span>}
-                  <span className="field-hint" style={{marginLeft:"auto"}}>{it.key}</span>
                 </div>
               </div>
             );

@@ -55,11 +55,20 @@ class SiteConfigAdmin(ModelAdmin):
 
 @admin.register(SiteText)
 class SiteTextAdmin(ModelAdmin):
-    list_display = ("label", "key", "group", "order", "updated_at")
+    # `key` is an internal code identifier — kept searchable and on the detail
+    # form for reference, but out of the list so editors only see friendly text.
+    list_display = ("label", "group", "value_preview", "order", "updated_at")
     search_fields = ("key", "label", "value")
     list_filter = ("group",)
     ordering = ("group", "order", "key")
-    readonly_fields = ("updated_at",)
+    readonly_fields = ("key", "updated_at")
+
+    @admin.display(description="Current text")
+    def value_preview(self, obj):
+        text = (obj.value or "").strip()
+        if not text:
+            return "(empty)"
+        return text[:60] + ("..." if len(text) > 60 else "")
 
 
 class ResourceFileInline(TabularInline):

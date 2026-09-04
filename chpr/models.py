@@ -143,7 +143,7 @@ class SiteText(models.Model):
         verbose_name_plural = "Site text"
 
     def __str__(self):
-        return f"{self.label} ({self.key})"
+        return self.label
 
     @classmethod
     def as_map(cls):
