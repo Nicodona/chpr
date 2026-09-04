@@ -1,0 +1,52 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="chpr-dash">
+  <div class="chpr-dash-head">
+    <h1>{% trans "Dashboard" %}</h1>
+    <p>{% trans "Manage content, users and settings for the CHPR Resources Hub." %}</p>
+  </div>
+
+  <div class="chpr-cards">
+    {% for card in chpr_stats %}
+    <a class="chpr-card" href="{{ card.link }}">
+      <span class="chpr-card-icon"><span class="material-symbols-outlined">{{ card.icon }}</span></span>
+      <span class="chpr-card-text">
+        <span class="chpr-card-value">{{ card.value }}</span>
+        <span class="chpr-card-label">{{ card.title }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="chpr-panels">
+    <div class="chpr-panel">
+      <h2>{% trans "Recent resources" %}</h2>
+      <ul class="chpr-list">
+        {% for r in chpr_recent_resources %}
+        <li>
+          <a href="{% url 'admin:chpr_resource_change' r.pk %}">{{ r.name }}</a>
+          <span class="muted">{{ r.created_at|date:"M j" }}</span>
+        </li>
+        {% empty %}
+        <li class="chpr-empty">{% trans "No resources yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="chpr-panel">
+      <h2>{% trans "Recent messages" %}</h2>
+      <ul class="chpr-list">
+        {% for m in chpr_recent_messages %}
+        <li>
+          <a href="{% url 'admin:chpr_contactmessage_change' m.pk %}">{{ m.name }}</a>
+          <span class="muted">{{ m.created_at|date:"M j" }}</span>
+        </li>
+        {% empty %}
+        <li class="chpr-empty">{% trans "No messages yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

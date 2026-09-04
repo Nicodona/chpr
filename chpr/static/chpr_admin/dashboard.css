@@ -1,0 +1,62 @@
+/* CHPR admin dashboard: self-contained soft cards, brand blue, light + dark.
+   Loaded via UNFOLD["STYLES"] so it is independent of Unfold's Tailwind build. */
+
+.chpr-dash { display: flex; flex-direction: column; gap: 1.5rem; }
+.chpr-dash-head h1 { font-size: 1.5rem; font-weight: 600; margin: 0; color: #101828; }
+.chpr-dash-head p { margin: .3rem 0 0; font-size: .9rem; color: #667085; }
+
+.chpr-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.chpr-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: 1rem;
+  background: #ffffff;
+  border: 1px solid #e6e9f0;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  text-decoration: none;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.chpr-card:hover { box-shadow: 0 8px 24px rgba(16, 24, 40, .09); transform: translateY(-1px); }
+.chpr-card-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 3rem; height: 3rem; border-radius: .85rem;
+  background: #e6f1fb; color: #0054a6; flex-shrink: 0;
+}
+.chpr-card-icon .material-symbols-outlined { font-size: 1.5rem; line-height: 1; }
+.chpr-card-text { display: flex; flex-direction: column; }
+.chpr-card-value { font-size: 1.6rem; font-weight: 600; line-height: 1.1; color: #101828; }
+.chpr-card-label { font-size: .82rem; color: #667085; margin-top: .1rem; }
+
+.chpr-panels { display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+@media (min-width: 900px) { .chpr-panels { grid-template-columns: 1fr 1fr; } }
+.chpr-panel {
+  border-radius: 1rem; background: #ffffff; border: 1px solid #e6e9f0;
+  padding: 1.25rem; box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+.chpr-panel h2 { font-size: 1rem; font-weight: 600; margin: 0 0 .75rem; color: #101828; }
+.chpr-list { list-style: none; margin: 0; padding: 0; }
+.chpr-list li {
+  display: flex; justify-content: space-between; gap: .75rem;
+  padding: .6rem 0; border-top: 1px solid #eef1f6; font-size: .9rem;
+}
+.chpr-list li:first-child { border-top: 0; }
+.chpr-list a { color: #0054a6; text-decoration: none; }
+.chpr-list a:hover { text-decoration: underline; }
+.chpr-list .muted { color: #98a2b3; white-space: nowrap; }
+.chpr-empty { color: #98a2b3; font-size: .9rem; padding: .6rem 0; }
+
+/* Dark mode: Unfold toggles the `dark` class on <html>. */
+html.dark .chpr-dash-head h1 { color: #f2f4f7; }
+html.dark .chpr-dash-head p,
+html.dark .chpr-card-label { color: #98a2b3; }
+html.dark .chpr-card,
+html.dark .chpr-panel { background: #18181b; border-color: #2a2a30; box-shadow: none; }
+html.dark .chpr-card-value,
+html.dark .chpr-panel h2 { color: #f2f4f7; }
+html.dark .chpr-card-icon { background: rgba(0, 84, 166, .20); color: #7db3e6; }
+html.dark .chpr-list li { border-color: #2a2a30; }
+html.dark .chpr-list a { color: #7db3e6; }

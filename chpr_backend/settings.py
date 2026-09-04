@@ -51,6 +51,10 @@ FRONTEND_BUILD_DIR = Path(
 # Applications
 # ---------------------------------------------------------------------------
 INSTALLED_APPS = [
+    # Unfold admin theme — must come before django.contrib.admin.
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -85,7 +89,7 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         # The React build's index.html is served as a template by the SPA catch-all.
-        "DIRS": [FRONTEND_BUILD_DIR],
+        "DIRS": [BASE_DIR / "templates", FRONTEND_BUILD_DIR],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -139,6 +143,100 @@ STATIC_URL = "/static/"
 _FRONTEND_STATIC_DIR = FRONTEND_BUILD_DIR / "static"
 STATICFILES_DIRS = [_FRONTEND_STATIC_DIR] if _FRONTEND_STATIC_DIR.exists() else []
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# ── Unfold admin theme ────────────────────────────────────────────────────────
+from django.templatetags.static import static  # noqa: E402
+from django.urls import reverse_lazy  # noqa: E402
+from django.utils.translation import gettext_lazy as _  # noqa: E402
+
+UNFOLD = {
+    "SITE_TITLE": "CHPR Resources Hub",
+    "SITE_HEADER": "CHPR Resources Hub",
+    "SITE_SUBHEADER": _("Administration"),
+    "SITE_URL": "/",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    # THEME omitted on purpose so the light/dark switcher stays available.
+    "DASHBOARD_CALLBACK": "chpr.admin_dashboard.dashboard_callback",
+    "STYLES": [
+        lambda request: static("chpr_admin/dashboard.css"),
+    ],
+    "COLORS": {
+        # Brand blue #0054A6 expressed as an oklch shade scale (hue 255).
+        "primary": {
+            "50": "oklch(97.0% 0.020 255.0)",
+            "100": "oklch(93.2% 0.045 255.0)",
+            "200": "oklch(87.5% 0.075 255.0)",
+            "300": "oklch(79.0% 0.110 255.0)",
+            "400": "oklch(70.0% 0.140 255.0)",
+            "500": "oklch(62.0% 0.155 255.0)",
+            "600": "oklch(54.5% 0.160 255.0)",
+            "700": "oklch(48.5% 0.150 255.0)",
+            "800": "oklch(42.5% 0.130 255.0)",
+            "900": "oklch(37.5% 0.110 255.0)",
+            "950": "oklch(27.5% 0.080 255.0)",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": _("Overview"),
+                "items": [
+                    {"title": _("Dashboard"), "icon": "dashboard",
+                     "link": reverse_lazy("admin:index")},
+                ],
+            },
+            {
+                "title": _("Content"),
+                "separator": True,
+                "items": [
+                    {"title": _("Resources"), "icon": "description",
+                     "link": reverse_lazy("admin:chpr_resource_changelist")},
+                    {"title": _("Projects"), "icon": "workspaces",
+                     "link": reverse_lazy("admin:chpr_project_changelist")},
+                    {"title": _("FAQs"), "icon": "help",
+                     "link": reverse_lazy("admin:chpr_faq_changelist")},
+                    {"title": _("Site text"), "icon": "translate",
+                     "link": reverse_lazy("admin:chpr_sitetext_changelist")},
+                    {"title": _("Converted documents"), "icon": "picture_as_pdf",
+                     "link": reverse_lazy("admin:chpr_resourcehtml_changelist")},
+                    {"title": _("Quiz questions"), "icon": "quiz",
+                     "link": reverse_lazy("admin:chpr_quizquestion_changelist")},
+                    {"title": _("Comments"), "icon": "forum",
+                     "link": reverse_lazy("admin:chpr_resourcecomment_changelist")},
+                ],
+            },
+            {
+                "title": _("People & messages"),
+                "separator": True,
+                "items": [
+                    {"title": _("Staff profiles"), "icon": "badge",
+                     "link": reverse_lazy("admin:chpr_staffprofile_changelist")},
+                    {"title": _("Users"), "icon": "person",
+                     "link": reverse_lazy("admin:auth_user_changelist")},
+                    {"title": _("Groups"), "icon": "groups",
+                     "link": reverse_lazy("admin:auth_group_changelist")},
+                    {"title": _("Contact messages"), "icon": "mail",
+                     "link": reverse_lazy("admin:chpr_contactmessage_changelist")},
+                ],
+            },
+            {
+                "title": _("Analytics & settings"),
+                "separator": True,
+                "items": [
+                    {"title": _("Site visits"), "icon": "visibility",
+                     "link": reverse_lazy("admin:chpr_sitevisit_changelist")},
+                    {"title": _("Resource interactions"), "icon": "ads_click",
+                     "link": reverse_lazy("admin:chpr_resourceinteraction_changelist")},
+                    {"title": _("Site configuration"), "icon": "settings",
+                     "link": reverse_lazy("admin:chpr_siteconfig_changelist")},
+                ],
+            },
+        ],
+    },
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

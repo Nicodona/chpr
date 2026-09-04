@@ -10,6 +10,8 @@ from datetime import timedelta
 from django.utils import timezone
 
 from django.contrib.auth.models import User
+from django.test import Client
+from django.urls import reverse
 
 from chpr.models import Project, Resource, ResourceFile, SiteConfig, SiteText, StaffProfile
 
@@ -100,6 +102,46 @@ class SiteTextAPITests(TestCase):
         for k in ("nav.all_resources", "nav.sign_in", "home.latest_title",
                   "footer.org_name", "faq.button_label"):
             self.assertIn(k, keys)
+
+
+class AdminRendersTests(TestCase):
+    """Every admin page must render under the Unfold theme (catches template,
+    ModelAdmin, sidebar reverse() and dashboard-callback breakage server-side)."""
+
+    CHANGELISTS = [
+        "chpr_resource", "chpr_project", "chpr_faq", "chpr_sitetext",
+        "chpr_resourcehtml", "chpr_quizquestion", "chpr_resourcecomment",
+        "chpr_staffprofile", "chpr_contactmessage", "chpr_sitevisit",
+        "chpr_resourceinteraction", "chpr_siteconfig",
+        "auth_user", "auth_group",
+    ]
+    ADD_PAGES = ["chpr_resource", "chpr_project", "chpr_faq", "auth_user"]
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_superuser("admin_render", "a@example.com", "pw-x-123")
+        self.client.force_login(self.admin)
+
+    def test_dashboard_index_renders(self):
+        res = self.client.get(reverse("admin:index"))
+        self.assertEqual(res.status_code, 200)
+        # Dashboard-callback context reached the template.
+        self.assertContains(res, "Recent resources")
+
+    def test_all_changelists_render(self):
+        for name in self.CHANGELISTS:
+            res = self.client.get(reverse(f"admin:{name}_changelist"))
+            self.assertEqual(res.status_code, 200, f"{name} changelist -> {res.status_code}")
+
+    def test_key_add_pages_render(self):
+        for name in self.ADD_PAGES:
+            res = self.client.get(reverse(f"admin:{name}_add"))
+            self.assertEqual(res.status_code, 200, f"{name} add -> {res.status_code}")
+
+    def test_login_page_uses_unfold(self):
+        Client().logout()
+        res = Client().get(reverse("admin:login"))
+        self.assertEqual(res.status_code, 200)
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

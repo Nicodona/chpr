@@ -1,11 +1,16 @@
-"""Django admin registrations for the CHPR Resources Hub."""
+"""Django admin registrations for the CHPR Resources Hub (Unfold-themed)."""
 from django.contrib import admin
+from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import Group, User
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from .models import FAQ, ContactMessage, Project, QuizQuestion, Resource, ResourceComment, ResourceFile, ResourceHTML, ResourceInteraction, SiteConfig, SiteText, SiteVisit, StaffProfile
 
 
 @admin.register(StaffProfile)
-class StaffProfileAdmin(admin.ModelAdmin):
+class StaffProfileAdmin(ModelAdmin):
     list_display = ("user", "role", "department")
     list_filter = ("role", "department")
     list_editable = ("role", "department")
@@ -13,7 +18,7 @@ class StaffProfileAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user",)
 
 
-class ResourceInline(admin.TabularInline):
+class ResourceInline(TabularInline):
     model = Resource
     extra = 0
     fields = ("name", "type_key", "activity", "file")
@@ -21,7 +26,7 @@ class ResourceInline(admin.TabularInline):
 
 
 @admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin):
+class ProjectAdmin(ModelAdmin):
     list_display = ("name", "slug", "status", "resource_count", "order", "has_logo")
     list_editable = ("status", "order")
     list_filter = ("status",)
@@ -37,7 +42,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
 
 @admin.register(SiteConfig)
-class SiteConfigAdmin(admin.ModelAdmin):
+class SiteConfigAdmin(ModelAdmin):
     list_display = ("__str__", "nav_projects_count", "home_projects_count", "updated_at")
 
     def has_add_permission(self, request):
@@ -49,7 +54,7 @@ class SiteConfigAdmin(admin.ModelAdmin):
 
 
 @admin.register(SiteText)
-class SiteTextAdmin(admin.ModelAdmin):
+class SiteTextAdmin(ModelAdmin):
     list_display = ("label", "key", "group", "order", "updated_at")
     search_fields = ("key", "label", "value")
     list_filter = ("group",)
@@ -57,13 +62,13 @@ class SiteTextAdmin(admin.ModelAdmin):
     readonly_fields = ("updated_at",)
 
 
-class ResourceFileInline(admin.TabularInline):
+class ResourceFileInline(TabularInline):
     model = ResourceFile
     extra = 1
     fields = ("language", "file", "order")
 
 
-class QuizQuestionInline(admin.StackedInline):
+class QuizQuestionInline(StackedInline):
     model = QuizQuestion
     extra = 0
     classes = ("collapse",)
@@ -78,7 +83,7 @@ class QuizQuestionInline(admin.StackedInline):
 
 
 @admin.register(Resource)
-class ResourceAdmin(admin.ModelAdmin):
+class ResourceAdmin(ModelAdmin):
     inlines = [ResourceFileInline, QuizQuestionInline]
     actions = ("regenerate_quiz",)
 
@@ -108,7 +113,7 @@ class ResourceAdmin(admin.ModelAdmin):
 
 
 @admin.register(ResourceHTML)
-class ResourceHTMLAdmin(admin.ModelAdmin):
+class ResourceHTMLAdmin(ModelAdmin):
     """Converted web versions of PDF/DOCX uploads (read-mostly; use the
     action to force a re-conversion after a library upgrade or fix)."""
     list_display = ("resource", "language", "status", "page_count", "word_count", "updated_at")
@@ -137,7 +142,7 @@ class ResourceHTMLAdmin(admin.ModelAdmin):
 
 
 @admin.register(QuizQuestion)
-class QuizQuestionAdmin(admin.ModelAdmin):
+class QuizQuestionAdmin(ModelAdmin):
     """Edit auto-generated or hand-written quiz questions.
     Un-tick 'auto generated' on a question you've rewritten so a quiz
     regeneration never deletes it."""
@@ -169,14 +174,14 @@ class QuizQuestionAdmin(admin.ModelAdmin):
 
 
 @admin.register(ResourceComment)
-class ResourceCommentAdmin(admin.ModelAdmin):
+class ResourceCommentAdmin(ModelAdmin):
     list_display = ("author_name", "author_role", "resource", "created_at")
     search_fields = ("author_name", "body")
     list_filter = ("author_role",)
 
 
 @admin.register(ContactMessage)
-class ContactMessageAdmin(admin.ModelAdmin):
+class ContactMessageAdmin(ModelAdmin):
     list_display = ("name", "email", "team", "handled", "created_at")
     list_filter = ("handled", "team")
     list_editable = ("handled",)
@@ -185,7 +190,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
 
 
 @admin.register(FAQ)
-class FAQAdmin(admin.ModelAdmin):
+class FAQAdmin(ModelAdmin):
     list_display = ("question_short", "order", "is_active", "created_at")
     list_editable = ("order", "is_active")
     list_filter = ("is_active",)
@@ -198,7 +203,7 @@ class FAQAdmin(admin.ModelAdmin):
 
 
 @admin.register(SiteVisit)
-class SiteVisitAdmin(admin.ModelAdmin):
+class SiteVisitAdmin(ModelAdmin):
     list_display = ("user_type", "page", "ip_address", "timestamp")
     list_filter = ("user_type",)
     readonly_fields = ("timestamp",)
@@ -206,8 +211,25 @@ class SiteVisitAdmin(admin.ModelAdmin):
 
 
 @admin.register(ResourceInteraction)
-class ResourceInteractionAdmin(admin.ModelAdmin):
+class ResourceInteractionAdmin(ModelAdmin):
     list_display = ("interaction_type", "resource", "user_type", "timestamp")
     list_filter = ("interaction_type", "user_type")
     readonly_fields = ("timestamp",)
     date_hierarchy = "timestamp"
+
+
+# ── Re-register the built-in auth admin so it matches the Unfold theme ─────────
+admin.site.unregister(User)
+admin.site.unregister(Group)
+
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
+
+
+@admin.register(Group)
+class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+    pass
