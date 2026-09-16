@@ -22,6 +22,10 @@ env = environ.Env(
 environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-key-change-me-in-production")
+
+# Admin URL path. Kept configurable and OUT of the public repo — the real
+# private path is set via ADMIN_URL in .env on the server (default is admin/).
+ADMIN_URL = env("ADMIN_URL", default="admin/").strip("/") + "/"
 DEBUG = env.bool("DEBUG")
 ALLOWED_HOSTS = ["*"]
 

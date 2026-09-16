@@ -1406,9 +1406,9 @@ export default function ManagePanel() {
           <span className="section-eyebrow">Administrator</span>
           <h1 className="mp-title">Management Panel</h1>
         </div>
-        <a href="/admin/" target="_blank" rel="noopener noreferrer" className="mp-django-btn">
-          Django Admin ↗
-        </a>
+        {/* Django Admin link removed: the admin now lives at a private path
+            (set via ADMIN_URL in .env) and must not be exposed in the public
+            frontend bundle. Reach it via the bookmarked private URL. */}
       </div>
 
       <div className="mp-tabs">

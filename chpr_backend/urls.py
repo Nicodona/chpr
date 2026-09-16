@@ -39,7 +39,8 @@ def csrf_cookie(request):
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Admin mounted at settings.ADMIN_URL (private path from .env; default admin/).
+    path(settings.ADMIN_URL, admin.site.urls),
 
     # CSRF handshake — must be declared before the api/ include
     path('api/csrf/', csrf_cookie, name='csrf-cookie'),
