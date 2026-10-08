@@ -6,9 +6,54 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>CHPR Resources Hub</title>
+
+    <!-- Description + canonical: help scanners and link-preview services see a
+         legitimate organisational staff portal, not a blank app shell. -->
+    <meta
+      name="description"
+      content="The official staff resources portal of the Center for Health Promotion and Research (CHPR): training documents, guides and videos for CHPR projects and partner sites."
+    />
+    <meta name="author" content="Center for Health Promotion and Research (CHPR)" />
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="canonical" href="https://chpr-resource.org/" />
+
+    <!-- Open Graph (Teams / Outlook / WhatsApp link previews) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CHPR Resources Hub" />
+    <meta property="og:title" content="CHPR Resources Hub" />
+    <meta
+      property="og:description"
+      content="The official staff resources portal of the Center for Health Promotion and Research (CHPR): training documents, guides and videos for CHPR projects and partner sites."
+    />
+    <meta property="og:url" content="https://chpr-resource.org/" />
+    <meta property="og:image" content="https://chpr-resource.org/logo.png" />
+
+    <!-- Twitter card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="CHPR Resources Hub" />
+    <meta
+      name="twitter:description"
+      content="The official staff resources portal of the Center for Health Promotion and Research (CHPR)."
+    />
+    <meta name="twitter:image" content="https://chpr-resource.org/logo.png" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width:640px;margin:48px auto;padding:0 24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;line-height:1.6;">
+        <h1 style="color:#0f766e;">CHPR Resources Hub</h1>
+        <p>
+          This is the official staff resources portal of the
+          <strong>Center for Health Promotion and Research (CHPR)</strong>. It
+          provides training documents, guides and videos for CHPR projects and
+          partner sites.
+        </p>
+        <p>
+          The portal needs JavaScript to run. Please enable JavaScript in your
+          browser, or contact the CHPR ICT team for assistance.
+        </p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
