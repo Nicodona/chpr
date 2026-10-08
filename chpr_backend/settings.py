@@ -331,6 +331,13 @@ SITE_URL = env("SITE_URL", default="http://localhost:5173")
 #   - Secure cookies: the session + CSRF cookies must only travel over HTTPS.
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
+# Referrer policy: Django's default is "same-origin", which sends NO Referer to
+# cross-origin sites. That breaks third-party embeds — YouTube can't verify the
+# embedding domain and shows "Video player configuration error (Error 153)".
+# "strict-origin-when-cross-origin" (the browser default) sends only our ORIGIN
+# (not the path) cross-origin, which is enough for embeds and stays private.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 if env.bool("BEHIND_TLS_PROXY", default=False):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
