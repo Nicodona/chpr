@@ -158,6 +158,11 @@ UNFOLD = {
     "SITE_HEADER": "CHPR Resources Hub",
     "SITE_SUBHEADER": _("Administration"),
     "SITE_URL": "/",
+    # Attractive login screen: a branded-blue abstract background beside the
+    # form (no logo, per request). Falls back gracefully if the asset is absent.
+    "LOGIN": {
+        "image": lambda request: static("chpr_admin/login-bg.svg"),
+    },
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     # THEME omitted on purpose so the light/dark switcher stays available.

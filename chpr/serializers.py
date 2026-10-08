@@ -100,7 +100,7 @@ class ResourceSerializer(serializers.ModelSerializer):
             "id", "slug", "project", "project_slug", "project_name",
             "name", "type_key", "type_label", "activity", "activity_label",
             "audience", "audience_label",
-            "description", "file", "file_url", "languages",
+            "description", "file", "file_url", "embed_url", "languages",
             "test_platform", "sample_type", "pool_size", "is_pool_test",
             "posted_by", "created_at", "updated_at",
         ]

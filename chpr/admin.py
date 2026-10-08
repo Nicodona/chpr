@@ -107,7 +107,7 @@ class ResourceAdmin(ModelAdmin):
     autocomplete_fields = ("project",)
     readonly_fields = ("created_at", "updated_at")
     fieldsets = (
-        (None, {"fields": ("project", "name", "type_key", "activity", "audience", "description", "file")}),
+        (None, {"fields": ("project", "name", "type_key", "activity", "audience", "description", "file", "embed_url")}),
         ("Pool testing", {
             "classes": ("collapse",),
             "fields": ("test_platform", "sample_type", "pool_size"),

@@ -1088,7 +1088,16 @@ export default function ResourceDetail() {
     );
   }
 
-  const { type_key, file_url, name, description, project_name, project_slug, posted_by, test_platform, sample_type } = resource;
+  const { type_key, file_url, name, description, project_name, project_slug, posted_by, test_platform, sample_type, embed_url } = resource;
+  // YouTube embed: when embed_url is set we play an inline iframe instead of a hosted file.
+  const ytId = (() => {
+    if (!embed_url) return "";
+    const m = embed_url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : "";
+  })();
+  const embedSrc = ytId ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0` : "";
+  const watchUrl = ytId ? `https://www.youtube.com/watch?v=${ytId}` : (embed_url || "");
+  const isEmbed = !!embedSrc;
   const typeLabel = resource.type_label || TYPE_LABELS[type_key] || type_key;
   const typeClass = TYPE_CLASS[type_key] || "";
 
@@ -1146,6 +1155,20 @@ export default function ResourceDetail() {
                   <path d="M10 3v10m0 0l-3.5-3.5M10 13l3.5-3.5" /><path d="M4 16.5h12" />
                 </svg>
                 Download{langs.length > 1 ? ` (${LANG_NAMES[activeLang] || activeLang})` : ""}
+              </a>
+            )}
+            {isEmbed && (
+              <a
+                className="rd-download-btn"
+                href={watchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open this video on YouTube"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
+                  <path d="M3 6.2c0-.9.6-1.6 1.5-1.8C6 4.1 10 4.1 10 4.1s4 0 5.5.3c.9.2 1.5.9 1.5 1.8.2 1.1.2 2.5.2 2.5s0 1.4-.2 2.5c0 .9-.6 1.6-1.5 1.8-1.5.3-5.5.3-5.5.3s-4 0-5.5-.3A1.9 1.9 0 0 1 3 11.2C2.8 10.1 2.8 8.7 2.8 8.7s0-1.4.2-2.5z"/><path fill="#fff" d="M8.5 10.9V6.6l3.6 2.2z"/>
+                </svg>
+                Watch on YouTube ↗
               </a>
             )}
             <button className={"rd-share-btn" + (copied ? " rd-share-copied" : "")} onClick={handleShare} title="Share this resource">
@@ -1257,7 +1280,8 @@ export default function ResourceDetail() {
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar (hidden for embedded videos — YouTube watch progress isn't trackable) */}
+        {!isEmbed && (
         <div className="rd-progress-wrap">
           <div className="rd-progress-bar-track">
             <div
@@ -1267,9 +1291,24 @@ export default function ResourceDetail() {
           </div>
           <span className="rd-progress-label">{progress}% {isVideo ? "watched" : "read"}</span>
         </div>
+        )}
 
         <div className="rd-reader-box">
-          {showWebReader && activeUrl ? (
+          {isEmbed ? (
+            <div
+              className="rd-embed-wrap"
+              style={{ position: "relative", width: "100%", paddingBottom: "56.25%", height: 0, borderRadius: "12px", overflow: "hidden", background: "#000" }}
+            >
+              <iframe
+                className="rd-embed"
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }}
+                src={embedSrc}
+                title={name}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          ) : showWebReader && activeUrl ? (
             <HtmlDocReader
               key={activeUrl}
               resourceId={resource.slug || resource.id}
@@ -1310,8 +1349,8 @@ export default function ResourceDetail() {
         </div>
       </div>
 
-      {/* Test Your Understanding (hidden for document resources per team request; kept for videos) */}
-      {!isDocFile && (
+      {/* Test Your Understanding (hidden for documents and embedded videos) */}
+      {!isDocFile && !isEmbed && (
       <div className="rd-quiz-section">
         <div className="rd-quiz-section-inner">
           <div className="rd-quiz-info">

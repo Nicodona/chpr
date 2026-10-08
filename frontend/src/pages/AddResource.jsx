@@ -18,6 +18,7 @@ const EMPTY = {
   audience: "all",
   description: "",
   posted_by: "",
+  embed_url: "",
   test_platform: "",
   sample_type: "",
   pool_size: "",
@@ -61,6 +62,7 @@ export default function AddResource() {
       audience: form.audience,
       description: form.description.trim(),
       posted_by: form.posted_by.trim(),
+      embed_url: form.embed_url.trim(),
       file,
     };
     if (isPool) {
@@ -226,6 +228,20 @@ export default function AddResource() {
               </div>
             </div>
           )}
+
+          <div className="field">
+            <label className="field-label">YouTube video link (optional)</label>
+            <input
+              className="field-input"
+              type="url"
+              value={form.embed_url}
+              onChange={(e) => set("embed_url", e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=…"
+            />
+            <p className="field-hint">
+              Paste a YouTube link to embed the video on the site (no upload needed). If you set this, leave the file empty.
+            </p>
+          </div>
 
           <div className="field">
             <label className="field-label">File (optional)</label>

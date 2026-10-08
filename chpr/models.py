@@ -200,6 +200,15 @@ class Resource(models.Model):
     # ---- Upload ----
     file = models.FileField(upload_to="resources/%Y/%m/", blank=True, null=True)
 
+    # ---- External video embed (e.g. YouTube) ----
+    # When set, the resource plays an embedded player on the site instead of a
+    # hosted file. Accepts any YouTube link form (watch?v=, youtu.be/, /embed/).
+    embed_url = models.URLField(
+        blank=True, default="",
+        help_text="Optional: paste a YouTube link to embed the video on the site "
+                  "instead of uploading a file.",
+    )
+
     # ---- Pool-testing fields (only meaningful for pool-test types) ----
     test_platform = models.CharField(
         max_length=100, blank=True,
